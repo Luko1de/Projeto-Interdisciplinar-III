@@ -126,3 +126,21 @@ st.write(top_rated_movies)
 st.write("Filmes com maior número de votos (top 10):")
 most_voted_movies = df_votes[['title', 'vote_count', 'vote_average']].sort_values(by='vote_count', ascending=False).head(10)
 st.write(most_voted_movies)
+
+# Preenchendo valores nulos em runtime 0
+df['runtime'] = df['runtime'].fillna(0)
+df_runtime = df[(df['runtime'] > 0)]
+
+# Distribuição da duração dos filmes
+fig_runtime = px.histogram(df_runtime, x='runtime', nbins=20, labels={'runtime': 'Duração (minutos)'}, title='Distribuição da duração dos filmes')
+fig_runtime.update_traces(xbins=dict(
+    start = 0,
+    end = 500,
+    size = 20
+))
+st.plotly_chart(fig_runtime, use_container_width=True)
+
+# Filmes com maior duração
+st.write("Filmes com maior duração (top 10):")
+most_voted_movies = df_runtime[['title', 'runtime']].sort_values(by='runtime', ascending=False).head(10)
+st.write(most_voted_movies)
