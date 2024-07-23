@@ -91,3 +91,38 @@ fig_bar = px.bar(x=genre_counts.values,
                  title='Quantidade de Filmes por Gênero')
 
 st.plotly_chart(fig_bar, use_container_width=True)
+
+# Remover vote_average iguais a 0 e vote_count menores que 300
+vote_count_threshold = 300
+df_votes = df[(df['vote_average'] > 0) & (df['vote_count'] > vote_count_threshold)]
+
+# Distribuição das avaliações
+fig_vote_average = px.histogram(df_votes, x='vote_average', nbins=20, labels={'vote_average': 'Avaliação média'}, title='Distribuição das avaliações')
+st.plotly_chart(fig_vote_average, use_container_width=True)
+
+# Distribuição da contagem de votos (vote_count)
+fig_vote_count = px.histogram(df_votes, x='vote_count', nbins=20, labels={'vote_count': 'Contagem de votos'}, title='Distribuição da contagem de votos')
+st.plotly_chart(fig_vote_count, use_container_width=True)
+
+# Relação entre avaliação média e quantidade de votos
+fig_vote_scatter = px.scatter(df_votes, x='vote_count', y='vote_average', labels={'vote_count': 'Contagem de votos', 'vote_average': 'Avaliação média'}, title='Relação entre avaliação média e Contagem de votos')
+st.plotly_chart(fig_vote_scatter, use_container_width=True)
+
+# Distribuição de notas por gênero
+# Transformar DataFrame para long format para Plotly
+df_genres = df_votes.melt(id_vars=['title', 'vote_average'], value_vars=list(all_genres), var_name='genre', value_name='presence')
+df_genres = df_genres[df_genres['presence'] == 1]
+
+# Criar box plot
+fig_box_genre = px.box(df_genres, x='genre', y='vote_average', labels={'genre': 'Gênero', 'vote_average': 'Avaliação média'}, title='Distribuição de notas por gênero')
+st.plotly_chart(fig_box_genre, use_container_width=True)
+
+# Filmes mais bem avaliados
+st.write("Filmes mais bem avaliados (top 10):")
+top_rated_movies = df_votes[['title', 'vote_count', 'vote_average']].sort_values(by='vote_average', ascending=False).head(10)
+st.write(top_rated_movies)
+
+# Filmes com maior número de votos
+st.write("Filmes com maior número de votos (top 10):")
+most_voted_movies = df_votes[['title', 'vote_count', 'vote_average']].sort_values(by='vote_count', ascending=False).head(10)
+st.write(most_voted_movies)
