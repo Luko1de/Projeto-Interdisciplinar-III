@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # Carregar os dados
-df = pd.read_csv('C:/Users/lucas/Projetos 3/movies.csv')
+df = pd.read_csv(r'C:\Users\eleve\Downloads/movies.csv')
 
 # Análise Exploratória de Dados Inicial
 st.title("Análise Exploratória de Dados Inicial")
@@ -116,6 +116,19 @@ df_genres = df_genres[df_genres['presence'] == 1]
 # Criar box plot
 fig_box_genre = px.box(df_genres, x='genre', y='vote_average', labels={'genre': 'Gênero', 'vote_average': 'Avaliação média'}, title='Distribuição de notas por gênero')
 st.plotly_chart(fig_box_genre, use_container_width=True)
+
+# distrubuição de notas por decada
+vote_count_threshold = 150
+df_dates = df[(df['vote_average'] > 0) & (df['vote_count'] > vote_count_threshold)]
+# Converter release_date para datetime
+df_dates['release_date'] = pd.to_datetime(df_dates['release_date'], errors='coerce')
+
+# Adicionar coluna de década
+df_dates['decade'] = (df_dates['release_date'].dt.year // 10) * 10
+
+# Criar box plot
+fig_box_decade = px.box(df_dates, x='decade', y='vote_average', labels={'decade': 'Década de lançamento', 'vote_average': 'Avaliação média'}, title='Distribuição de notas por década de lançamento')
+st.plotly_chart(fig_box_decade, use_container_width=True)
 
 # Filmes mais bem avaliados
 st.write("Filmes mais bem avaliados (top 10):")
