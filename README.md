@@ -8,7 +8,7 @@ Este repositório contém um conjunto de dados atualizado diariamente sobre film
 O objetivo deste projeto é explorar e analisar o conjunto de dados sobre filmes disponível neste repositório. As análises visam responder às seguintes perguntas:
 
 1. É possível identificar grupos de filmes com base na relação entre o orçamento e a receita?
-2. É possível classificar os filmes em diferentes categorias de sucesso com base em múltiplos critérios, como popularidade, receita e avaliação média?
+2. Qual o algoritmo que obteve o melhor desempenho na recomendação de filmes, que garante o atendimento às preferências do usuário?
 
 ## Perguntas do Projeto
 
