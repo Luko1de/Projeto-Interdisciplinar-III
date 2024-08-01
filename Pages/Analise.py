@@ -2,6 +2,8 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud, STOPWORDS
 
 # Carregar os dados
 df = pd.read_csv(r'C:\Users\eleve\Downloads/movies.csv')
@@ -157,3 +159,19 @@ st.plotly_chart(fig_runtime, use_container_width=True)
 st.write("Filmes com maior duração (top 10):")
 most_voted_movies = df_runtime[['title', 'runtime']].sort_values(by='runtime', ascending=False).head(10)
 st.write(most_voted_movies)
+
+#Palavras chaves mais comuns
+st.write("Wordcloud das palavras chaves mais comuns")
+df_keywords = df['keywords']
+df.dropna(subset=['keywords'], axis=0, inplace=True)
+
+#Wordcloud
+all_keywords = "-".join(kw for kw in df_keywords)
+stopwords = set(STOPWORDS)
+stopwords.update(" ", "and", "of", "the")
+wordcloud  = WordCloud(stopwords=stopwords, background_color='white', width=600, height=400).generate(all_keywords)
+fig, ax = plt.subplots(figsize=(10,5))
+ax.imshow(wordcloud, interpolation='bilinear')
+ax.set_axis_off()
+plt.imshow(wordcloud)
+st.pyplot(fig) #plotagem no streamlit
