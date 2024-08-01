@@ -162,16 +162,17 @@ st.write(most_voted_movies)
 
 #Palavras chaves mais comuns
 st.write("Wordcloud das palavras chaves mais comuns")
-df_keywords = df['keywords']
-df.dropna(subset=['keywords'], axis=0, inplace=True)
 
-#Wordcloud
+# Carregar os dados
+df.dropna(subset=['keywords'], axis=0, inplace=True)
+df_keywords = df['keywords']
 all_keywords = "-".join(kw for kw in df_keywords)
 stopwords = set(STOPWORDS)
 stopwords.update(" ", "and", "of", "the")
-wordcloud  = WordCloud(stopwords=stopwords, background_color='white', width=600, height=400).generate(all_keywords)
+wordcloud  = WordCloud(stopwords=stopwords, background_color='white', width=800, height=600).generate(all_keywords)
+
 fig, ax = plt.subplots(figsize=(10,5))
 ax.imshow(wordcloud, interpolation='bilinear')
 ax.set_axis_off()
 plt.imshow(wordcloud)
-st.pyplot(fig) #plotagem no streamlit
+st.pyplot(fig)
