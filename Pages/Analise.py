@@ -176,3 +176,164 @@ ax.imshow(wordcloud, interpolation='bilinear')
 ax.set_axis_off()
 plt.imshow(wordcloud)
 st.pyplot(fig)
+st.title("Análise do ano de lançamento")
+
+#ver a coluna separa do ano de lançamento
+df['release_date'].head()
+
+#formatar a data 
+# Converter para datetime
+df['release_date'] = pd.to_datetime(df['release_date'], errors='coerce')
+st.write(df['release_date'])
+# Converter para datetime
+#print(df['release_date'].dtype)  # Verifique o tipo de dados
+st.write(df['release_date'].unique())  # Verifique os valores únicos
+
+
+#ver quantas datas faltam 
+#Criar uma nova coluna 'release_year' que contém apenas o ano de 'release_date'
+df['release_year'] = df['release_date'].dt.year
+df['release_year'] = df['release_year'].astype('Int64')
+st.write(df['release_year'])
+# Exibir as primeiras linhas do DataFrame para verificar o resultado
+print(df[['release_date', 'release_year']])
+
+# Contar o número de valores faltosos na coluna 'release_year'
+missing_years_count = df['release_year'].isna().sum()
+
+st.write(f"Quantidade de anos faltando: {missing_years_count}")
+
+# Substituir os anos faltando por 0
+df['release_year'] = df['release_year'].fillna(0)
+
+# Verificar se ainda existem valores faltando
+remaining_missing_years = df['release_year'].isna().sum()
+st.write(f"Quantidade de anos faltando após a substituição: {remaining_missing_years}")
+
+# Encontrar o primeiro ano de lançamento não nulo
+primeiro_ano = df['release_year'][df['release_year'] != 0].min()
+
+# Encontrar o último ano de lançamento
+ultimo_ano = df['release_year'].max()
+
+st.write("Primeiro ano de lançamento (não nulo):", primeiro_ano)
+st.write("Último ano de lançamento:", ultimo_ano)
+
+#quantidade de anos abaixo de 1900
+anos_1800_1900 = df[(df['release_year'] >= 1800) & (df['release_year'] <= 1900)].sort_values(by='release_year')
+anos_1800_1900.shape[0]
+
+st.write(df.groupby('release_year').size())
+
+
+
+from collections import Counter
+
+# Filtrar o DataFrame para filmes lançados antes de 1900
+filmes_antes_1900 = df[df['release_year'] < 1900]
+
+# Contar a frequência de cada gênero
+contagem_generos = Counter(filmes_antes_1900['genres'].dropna())
+
+# Encontrar os gêneros mais frequentes
+generos_mais_frequentes = contagem_generos.most_common(5)  # Top 5 gêneros mais frequentes
+
+# Imprimir os gêneros mais frequentes (ou uma mensagem indicando que não há gêneros)
+if generos_mais_frequentes:
+    st.write("Gêneros mais frequentes de filmes lançados antes de 1900:")
+    for genero, contagem in generos_mais_frequentes:
+        st.write(f"{genero}: {contagem}")
+else:
+    print("Não há informações de gênero disponíveis para filmes lançados antes de 1900.")
+
+# st.write("ver nomes dos filmes antes de 1900")
+
+# print("Nomes dos filmes antes de 1900")
+# # Filtrar o DataFrame para filmes lançados antes de 1900
+# filmes_antes_1900 = df[df['release_year'] < 1900]
+
+# # Selecionar a coluna 'title' (nomes dos filmes)
+# nomes_filmes_antes_1900 = filmes_antes_1900['title']
+
+# # Imprimir os nomes dos filmes
+# print("Nomes dos filmes lançados antes de 1900:")
+# for nome in nomes_filmes_antes_1900:
+#     st.write(nome)
+
+# st.write("Nomes do filmes depois de 2024")
+
+# # Filtrar o DataFrame para filmes lançados depois de 2024
+# filmes_depois_2024 = df[df['release_year'] > 2024]
+
+# # Selecionar a coluna 'title' (nomes dos filmes)
+# nomes_filmes_depois_2024 = filmes_depois_2024['title']
+
+# # Imprimir os nomes dos filmes
+# print("Nomes dos filmes lançados depois de 2024:")
+# for nome in nomes_filmes_depois_2024:
+#   print(nome)
+
+
+
+# # Filtrar o DataFrame para filmes lançados depois de 2024
+# filmes_depois_2024 = df[df['release_year'] > 2024]
+
+# # Contar o número de filmes
+# quantidade_filmes_depois_2024 = filmes_depois_2024.shape[0]
+
+# # Imprimir o resultado
+# st.write("Quantidade de filmes lançados depois de 2024:", quantidade_filmes_depois_2024)
+
+one_hot_ano = pd.get_dummies(df, columns=['release_year'])
+print(one_hot_ano)
+
+st.write("Filmes mais populares por ano")
+df['decade'] = (df['release_year'] // 10) * 10
+popularidade_por_ano = df.groupby(df['decade'])['popularity'].mean()
+
+# Ordenar por popularidade média decrescente
+popularidade_por_ano_ordenada = popularidade_por_ano.sort_values(ascending=False).astype(int)
+
+
+# Exibir os anos com maior popularidade média
+st.write(popularidade_por_ano_ordenada.head(10))
+
+# plt.figure(figsize=(12, 6))
+# popularidade_por_ano_ordenada.plot(kind='bar')
+# plt.xlabel('Ano de Lançamento')
+# plt.ylabel('Popularidade Média')
+# plt.title('Popularidade Média de Filmes por Ano de Lançamento')
+# plt.xticks(rotation=45)
+# plt.tight_layout()
+# plt.show()
+
+st.write("Quantidade de filmes por ano")
+contagem_anos = df['release_year'].value_counts()
+
+# Ordenar os anos por frequência decrescente
+contagem_anos_ordenada = contagem_anos.sort_values(ascending=False)
+
+# Exibir os anos mais frequentes
+st.write(contagem_anos_ordenada.head(10))
+
+
+st.write("Filmes mais populares por época")
+epocas = {
+    "Filmes da antiguidade(1800 até 1900)": (1800, 1900),
+    "Filmes Antigos(1900 até 950)": (1900, 1950),
+    "Filmes de 1900": (1950, 2000),
+    "Filmes anos 2000": (2000, 2012),
+    "Filmes atuais": (2012, 2024)
+}
+
+# Encontrar os filmes mais populares por época
+for epoca, (inicio, fim) in epocas.items():
+    # Filtrar os filmes da época
+    filmes_epoca = df[(df['release_date'].dt.year >= inicio) & (df['release_date'].dt.year <= fim)]
+
+    # Ordenar os filmes por popularidade decrescente
+    filmes_epoca_ordenados = filmes_epoca.sort_values(by='popularity', ascending=False)
+
+    # Exibir os 3 filmes mais populares da época
+    print(f"\n--- {epoca} ---")
+    st.write(filmes_epoca_ordenados[['title', 'popularity']].head(3))
