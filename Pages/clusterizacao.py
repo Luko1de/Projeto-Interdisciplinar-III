@@ -1,95 +1,142 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler, MultiLabelBinarizer
+from sklearn.cluster import MiniBatchKMeans, KMeans
 from sklearn.metrics import silhouette_score
-from sklearn.preprocessing import FunctionTransformer
-import nltk
-from nltk.stem import WordNetLemmatizer
-import time
+import matplotlib.pyplot as plt
+import plotly.express as px
+import numpy as np
+import seaborn as sns
 
-# Função para aplicar lemmatization
-def lemmatize_text(text):
-    lemmatizer = WordNetLemmatizer()
-    return ' '.join([lemmatizer.lemmatize(word) for word in text.split()])
+# Título do App
+st.title('Clusterização de Filmes')
 
-# Função para aplicar transformação de dados
-def process_data(df):
-    df['keywords'] = df['keywords'].astype(str).fillna('')
-    df['genres'] = df['genres'].astype(str).fillna('')
-    df['keywords'] = df['keywords'].apply(lambda x: ' '.join(x.split('-')))
-    df['genres'] = df['genres'].apply(lambda x: ' '.join(x.split('-')))
-    df['keywords'] = df['keywords'].apply(lemmatize_text)
-    df['genres'] = df['genres'].apply(lemmatize_text)
-    return df
+# Explicação inicial
+st.markdown("""
+Para fazer o processo de clusterização do dataset foi utilizando o algoritmo K-Means.
+O objetivo é identificar grupos de filmes semelhantes com base em suas características.
+""")
 
-# Função para criar e ajustar o modelo KMeans e calcular a inércia e o índice de Silhueta
-def calculate_metrics(X, k_range):
-    inertia = []
-    silhouette_scores = []
-    for k in k_range:
-        kmeans = KMeans(n_clusters=k, init='k-means++', max_iter=300, n_init=10, random_state=0)
-        kmeans.fit(X)
-        inertia.append(kmeans.inertia_)
-        
-        # Calcular o índice de Silhueta, somente para k > 1
-        if k > 1:
-            labels = kmeans.labels_
-            silhouette_avg = silhouette_score(X, labels, metric='euclidean')
-            silhouette_scores.append(silhouette_avg)
-        else:
-            silhouette_scores.append(None)
-    
-    return inertia, silhouette_scores
+# Carregar o dataset
+st.markdown("### Carregando o Dataset")
+df = pd.read_parquet(r"C:\Users\Aline\OneDrive - MSFT\UFRPE - OD\pisi3-2024.1\Projeto-Interdisciplinar-III - v03\utils\movies_cleaned.parquet")
+st.write("Dataset carregado com sucesso! Exibindo as primeiras linhas:")
+st.dataframe(df.head())
 
-# Título do aplicativo
-st.markdown("<h2 style='text-align: left; color: white;'>Método Elbow e Índice de Silhueta para Determinação de Número de Clusters</h2>", unsafe_allow_html=True)
+# Amostragem para facilitar a clusterização
+st.markdown("### Amostragem")
+df_amostra = df.sample(n=7000, random_state=42)
+st.write(f"Foi selecionada uma amostra de {len(df_amostra)} filmes para facilitar o processo de clusterização.")
 
-# Marcar o início do tempo
-start_time = time.time()
+# Remover colunas desnecessárias
+st.markdown("### Remoção de Colunas Desnecessárias")
+df_amostra = df_amostra.drop(['poster_path', 'backdrop_path', 'production_companies', 'status'], axis=1)
+st.write("As colunas irrelevantes para a clusterização foram removidas.")
 
-# Carregar e processar os dados
-df = pd.read_csv(r'C:\Users\Aline\OneDrive - MSFT\UFRPE - OD\pisi3-2024.1\Projeto-Interdisciplinar-III - v03\utils\movies_cleaned.csv')
-df = process_data(df)
+# One-Hot Encoding para os gêneros
+st.markdown("### Codificação dos Gêneros")
+mlb = MultiLabelBinarizer()
+generos_binarios = mlb.fit_transform(df_amostra['genres'].str.split('-'))
+df_encoded = pd.DataFrame(generos_binarios, columns=mlb.classes_, index=df_amostra.index)
+df_amostra = pd.concat([df_amostra, df_encoded], axis=1)
+st.write("Os gêneros dos filmes foram codificados em uma forma numérica (One-Hot Encoding).")
 
-# Combinar palavras-chave e gêneros
-df_combined = df['keywords'] + ' ' + df['genres']
+# Selecionar e normalizar as colunas relevantes
+st.markdown("### Normalização dos Dados")
+features = df_amostra[['popularity', 'vote_average'] + list(mlb.classes_)]
+scaler = StandardScaler()
+features[['popularity', 'vote_average']] = scaler.fit_transform(features[['popularity', 'vote_average']])
+st.write("As colunas 'popularity' e 'vote_average' foram normalizadas para facilitar a clusterização.")
 
-# Utilizar o TfidfVectorizer para transformar as palavras-chave e gêneros em numeração
-vectorizer = TfidfVectorizer(stop_words='english')
-X_tfidf = vectorizer.fit_transform(df_combined)
+# Determinar o número de clusters utilizando Elbow e Silhouette
+st.markdown("### Determinando o Número Ideal de Clusters")
+range_n_clusters = list(range(2, 11))
+silhouette_avg = []
 
-# Faixa de números de clusters para testar
-k_range = range(1, 11)
+for num_clusters in range_n_clusters:
+    kmeans = MiniBatchKMeans(n_clusters=num_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(features)
+    silhouette_avg.append(silhouette_score(features, cluster_labels))
 
-# Calcular inércia e índice de Silhueta
-st.write("Calculando a inércia e o índice de Silhueta para cada número de clusters.")
-inertia, silhouette_scores = calculate_metrics(X_tfidf, k_range)
+plt.figure(figsize=(12, 6))
+plt.plot(range_n_clusters, silhouette_avg, marker='o')
+plt.xlabel('Número de Clusters', fontsize=14)
+plt.ylabel('Silhouette Score', fontsize=14)
+plt.title('Método da Silhueta para Seleção do Número de Clusters', fontsize=16)
+plt.grid(True)
+st.pyplot(plt)
+st.write("O gráfico acima mostra o Método da Silhueta, que ajuda a identificar o número ideal de clusters.")
 
-# Plotar o gráfico Elbow
-st.write("Exibindo o gráfico Elbow para entender o número de clusters por palavras-chave e gênero")
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(k_range, inertia, marker='o')
-ax.set_title('Método Elbow')
-ax.set_xlabel('Número de Clusters (k)')
-ax.set_ylabel('Inércia')
-st.pyplot(fig)
+# Selecionar o melhor número de clusters
+num_clusters = range_n_clusters[silhouette_avg.index(max(silhouette_avg))]
 
+# Criar e ajustar o modelo KMeans com o número de clusters ideal
+kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+df_amostra['cluster'] = kmeans.fit_predict(features)
+st.write(f"O número ideal de clusters é {num_clusters}. Os filmes foram agrupados de acordo com este valor.")
 
-st.write("Com base no gráfico Elbow, não foi possível identificar o número ideal de clusters, por isto devemos calcular o índice do método da silhueta.")
+# Visualizar os clusters usando Plotly
+st.markdown("### Visualização dos Clusters")
+fig = px.scatter(df_amostra, x='popularity', y='vote_average', color='cluster', title='Clusters de Filmes')
+fig.update_layout(
+    title='Clusters de Filmes',
+    title_x=0.5,
+    title_font_size=24,
+    xaxis_title='Popularidade',
+    yaxis_title='Média de Votos',
+    xaxis_title_font_size=16,
+    yaxis_title_font_size=16,
+    font=dict(size=14)
+)
+st.plotly_chart(fig)
+st.write("O gráfico acima mostra a distribuição dos filmes nos diferentes clusters.")
 
-# Plotar o gráfico de Índice de Silhueta
-st.write("Exibindo o gráfico de Índice de Silhueta para cada número de clusters.")
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.plot(k_range[1:], silhouette_scores[1:], marker='o', color='orange', label='Índice de Silhueta')
-ax.set_title('Índice de Silhueta para Número de Clusters')
-ax.set_xlabel('Número de Clusters (k)')
-ax.set_ylabel('Índice de Silhueta')
-ax.legend()
-st.pyplot(fig)
+# Clusterização com as outras colunas numéricas e os gêneros
+st.markdown("### Clusterização com Outras Colunas Numéricas")
+colunas_numericas = ['popularity', 'vote_average', 'runtime']
+dados_clusterizacao = np.concatenate((df_amostra[colunas_numericas], generos_binarios), axis=1)
 
-# Marcar o fim do tempo e calcular a duração
-end_time = time.time()
-execution_time = end_time - start_time
-st.write(f"Tempo de execução: {execution_time:.2f} segundos")
+inertia = []
+for i in range(1, 11):
+    kmeans = KMeans(n_clusters=i, random_state=42)
+    kmeans.fit(dados_clusterizacao)
+    inertia.append(kmeans.inertia_)
+
+plt.figure(figsize=(12, 6))
+plt.plot(range(1, 11), inertia, marker='o')
+plt.title('Método do Cotovelo')
+plt.xlabel('Número de Clusters')
+plt.ylabel('Soma dos Quadrados Intra-Clusters')
+st.pyplot(plt)
+st.write("O gráfico do cotovelo ajuda a visualizar o ponto em que a soma dos quadrados intra-cluster começa a estabilizar, sugerindo o número ideal de clusters.")
+
+silhouette_scores = []
+for i in range(2, 11):
+    kmeans = KMeans(n_clusters=i, random_state=42)
+    labels = kmeans.fit_predict(dados_clusterizacao)
+    silhouette_scores.append(silhouette_score(dados_clusterizacao, labels))
+
+plt.figure(figsize=(12, 6))
+plt.plot(range(2, 11), silhouette_scores, marker='o')
+plt.title('Análise da Silhueta')
+plt.xlabel('Número de Clusters')
+plt.ylabel('Coeficiente de Silhueta')
+st.pyplot(plt)
+st.write("O gráfico da silhueta fornece uma análise adicional sobre o número de clusters, similar ao gráfico anterior.")
+
+# Criar o modelo KMeans com o número de clusters escolhido
+st.markdown("### Resultados Finais da Clusterização")
+kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+df_amostra['cluster'] = kmeans.fit_predict(dados_clusterizacao)
+
+# Analisar e visualizar os clusters
+st.write("Contagem de filmes por cluster:")
+st.write(df_amostra.groupby('cluster')['title'].count())
+
+plt.figure(figsize=(16, 12))
+sns.scatterplot(x='runtime', y='vote_average', hue='cluster', data=df_amostra, palette='viridis', s=100)
+plt.title('Clusters de Filmes')
+plt.xlabel('Tempo de execução (Padronizado)')
+plt.ylabel('Votação (Padronizada)')
+st.pyplot(plt)
+st.write("O gráfico final mostra a distribuição dos clusters com base em 'runtime' e 'vote_average'.")
