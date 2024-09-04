@@ -368,7 +368,7 @@ st.plotly_chart(fig)
 
 
 silhouette_avg = silhouette_score(X, kmeans.labels_)
-print(f"Silhouette Score: {silhouette_avg}")
+st.write(f"Silhouette Score: {silhouette_avg}")
 
 # Calcular os coeficientes de silhueta para cada amostra
 sample_silhouette_values = silhouette_samples(X, kmeans.labels_)
@@ -408,7 +408,8 @@ ax.axvline(x=silhouette_avg, color="red", linestyle="--")
 ax.set_yticks([])
 ax.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
 
-plt.show()
+# Mostrar o gráfico no Streamlit
+st.pyplot(fig)
 
 
 cluster_stats = df_new_encoded.groupby('cluster').agg({
