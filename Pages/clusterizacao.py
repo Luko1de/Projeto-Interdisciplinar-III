@@ -7,136 +7,591 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import numpy as np
 import seaborn as sns
+from collections import Counter
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.metrics import silhouette_samples
+import matplotlib.cm as cm
+import streamlit as st
+import pandas as pd
+st.title('Exploração do Dataset de Filmes')
 
-# Título do App
-st.title('Clusterização de Filmes')
+# Caminho do arquivo CSV local
+file_path = r'C:\Users\Administrador\Desktop\movies.csv'
 
-# Explicação inicial
-st.markdown("""
-Para fazer o processo de clusterização do dataset foi utilizando o algoritmo K-Means.
-O objetivo é identificar grupos de filmes semelhantes com base em suas características.
-""")
+# Leitura do arquivo CSV
+df = pd.read_csv(file_path)
 
-# Carregar o dataset
-st.markdown("### Carregando o Dataset")
-df = pd.read_parquet(r"C:\Users\Aline\OneDrive - MSFT\UFRPE - OD\pisi3-2024.1\Projeto-Interdisciplinar-III - v03\utils\movies_cleaned.parquet")
-st.write("Dataset carregado com sucesso! Exibindo as primeiras linhas:")
-st.dataframe(df.head())
+# Exibir o DataFrame completo
+st.write("Amostra de 5.000 registros do dataset:")
+df_sample = df.sample(n=5000)
+st.dataframe(df_sample)
 
-# Amostragem para facilitar a clusterização
-st.markdown("### Amostragem")
-df_amostra = df.sample(n=7000, random_state=42)
-st.write(f"Foi selecionada uma amostra de {len(df_amostra)} filmes para facilitar o processo de clusterização.")
+# Exibir as dimensões do DataFrame
+st.write("Dimensões do dataset amostrado:", df_sample.shape)
 
-# Remover colunas desnecessárias
-st.markdown("### Remoção de Colunas Desnecessárias")
-df_amostra = df_amostra.drop(['poster_path', 'backdrop_path', 'production_companies', 'status'], axis=1)
-st.write("As colunas irrelevantes para a clusterização foram removidas.")
+# Seleção das colunas desejadas
+df_new = df_sample[['title', 'genres', 'original_language', 'popularity', 'release_date',
+                    'budget', 'revenue', 'runtime', 'vote_average', 'vote_count',
+                    'production_companies', 'recommendations', 'overview']]
 
-# One-Hot Encoding para os gêneros
-st.markdown("### Codificação dos Gêneros")
-mlb = MultiLabelBinarizer()
-generos_binarios = mlb.fit_transform(df_amostra['genres'].str.split('-'))
-df_encoded = pd.DataFrame(generos_binarios, columns=mlb.classes_, index=df_amostra.index)
-df_amostra = pd.concat([df_amostra, df_encoded], axis=1)
-st.write("Os gêneros dos filmes foram codificados em uma forma numérica (One-Hot Encoding).")
+# Conversão de 'release_date' para datetime
+# Crie uma cópia do DataFrame, se necessário
+# Convertendo 'release_date' para datetime e lidando com erros
+# Converta 'release_date' para datetime e trate erros
+df_new['release_date'] = pd.to_datetime(df_new['release_date'], errors='coerce')
 
-# Selecionar e normalizar as colunas relevantes
-st.markdown("### Normalização dos Dados")
-features = df_amostra[['popularity', 'vote_average'] + list(mlb.classes_)]
-scaler = StandardScaler()
-features[['popularity', 'vote_average']] = scaler.fit_transform(features[['popularity', 'vote_average']])
-st.write("As colunas 'popularity' e 'vote_average' foram normalizadas para facilitar a clusterização.")
+# Remover linhas com datas inválidas
+df_new = df_new.dropna(subset=['release_date'])
 
-# Determinar o número de clusters utilizando Elbow e Silhouette
-st.markdown("### Determinando o Número Ideal de Clusters")
-range_n_clusters = list(range(2, 11))
-silhouette_avg = []
+# Verifique o tipo de dado da coluna
+print(df_new['release_date'].dtype)
 
-for num_clusters in range_n_clusters:
-    kmeans = MiniBatchKMeans(n_clusters=num_clusters, random_state=42)
-    cluster_labels = kmeans.fit_predict(features)
-    silhouette_avg.append(silhouette_score(features, cluster_labels))
+# Extração do ano de lançamento
+df_new['release_year'] = df_new['release_date'].dt.year
 
-plt.figure(figsize=(12, 6))
-plt.plot(range_n_clusters, silhouette_avg, marker='o')
-plt.xlabel('Número de Clusters', fontsize=14)
-plt.ylabel('Silhouette Score', fontsize=14)
-plt.title('Método da Silhueta para Seleção do Número de Clusters', fontsize=16)
-plt.grid(True)
-st.pyplot(plt)
-st.write("O gráfico acima mostra o Método da Silhueta, que ajuda a identificar o número ideal de clusters.")
 
-# Selecionar o melhor número de clusters
-num_clusters = range_n_clusters[silhouette_avg.index(max(silhouette_avg))]
+# Exibir o DataFrame transformado
+st.write("Dados transformados com ano de lançamento:")
+st.dataframe(df_new)
 
-# Criar e ajustar o modelo KMeans com o número de clusters ideal
-kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-df_amostra['cluster'] = kmeans.fit_predict(features)
-st.write(f"O número ideal de clusters é {num_clusters}. Os filmes foram agrupados de acordo com este valor.")
 
-# Visualizar os clusters usando Plotly
-st.markdown("### Visualização dos Clusters")
-fig = px.scatter(df_amostra, x='popularity', y='vote_average', color='cluster', title='Clusters de Filmes')
-fig.update_layout(
-    title='Clusters de Filmes',
-    title_x=0.5,
-    title_font_size=24,
-    xaxis_title='Popularidade',
-    yaxis_title='Média de Votos',
-    xaxis_title_font_size=16,
-    yaxis_title_font_size=16,
-    font=dict(size=14)
-)
-st.plotly_chart(fig)
-st.write("O gráfico acima mostra a distribuição dos filmes nos diferentes clusters.")
 
-# Clusterização com as outras colunas numéricas e os gêneros
-st.markdown("### Clusterização com Outras Colunas Numéricas")
-colunas_numericas = ['popularity', 'vote_average', 'runtime']
-dados_clusterizacao = np.concatenate((df_amostra[colunas_numericas], generos_binarios), axis=1)
+@st.cache_data
+def get_sample_data(df_new, sample_size=5000):
+    return df.sample(n=sample_size)
 
-inertia = []
+# Função para criar o histograma
+@st.cache_data
+def criar_histograma(df, col):
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.histplot(df[col].dropna(), kde=True, ax=ax)  # Remove valores ausentes
+    ax.set_title(f'Distribuição de {col}')
+    ax.set_xlabel(col)
+    ax.set_ylabel('Frequência')
+    return fig
+
+# Substitua `df_new` pelo DataFrame que você estiver usando
+df_sample = get_sample_data(df_new)
+
+# Colunas numéricas que deseja analisar
+numerical_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
+
+# Garantir que todas as colunas numéricas estejam presentes no DataFrame amostrado
+numerical_cols = [col for col in numerical_cols if col in df_sample.columns]
+
+# Título da seção
+st.write("Distribuição das colunas numéricas:")
+
+# Gerar e exibir os gráficos para cada coluna numérica
+for col in numerical_cols:
+    if col in df_sample.columns:
+        st.write(f"**Distribuição de {col}**")
+        
+        # Criar o gráfico com dados amostrados
+        fig = criar_histograma(df_sample, col)
+        
+        # Exibir o gráfico no Streamlit
+        st.pyplot(fig)
+    else:
+        st.write(f"Coluna {col} não encontrada no DataFrame amostrado.")
+    
+def preprocess_data(df_new):
+    # Preencher valores ausentes nas colunas numéricas
+    df_new.loc[:, 'budget'] = df_new['budget'].fillna(df_new['budget'].mean())
+    df_new.loc[:, 'revenue'] = df_new['revenue'].fillna(df_new['revenue'].mean())
+    df_new.loc[:, 'runtime'] = df_new['runtime'].fillna(df_new['runtime'].mean())
+    df_new.loc[:, 'popularity'] = df_new['popularity'].fillna(df_new['popularity'].median())
+    df_new.loc[:, 'vote_average'] = df_new['vote_average'].fillna(df_new['vote_average'].mean())
+    df_new.loc[:, 'vote_count'] = df_new['vote_count'].fillna(df_new['vote_count'].median())
+
+    # Preencher valores ausentes nas colunas categóricas
+    df_new.loc[:, 'original_language'] = df_new['original_language'].fillna(df_new['original_language'].mode()[0])
+    df_new.loc[:, 'genres'] = df_new['genres'].fillna("Unknown")
+    df_new.loc[:, 'production_companies'] = df_new['production_companies'].fillna("Unknown")
+    df_new.loc[:, 'recommendations'] = df_new['recommendations'].fillna("Unknown")
+    df_new.loc[:, 'overview'] = df_new['overview'].fillna("No overview available")
+    
+    return df_new
+
+@st.cache_data
+def processar_generos(df_new):
+    # Etapa 1: Contar a frequência dos gêneros
+    all_genres = []
+    for genres_str in df_new['genres']:
+        if isinstance(genres_str, str):
+            genres_list = genres_str.strip('[]').replace("'", "").split(', ')
+            all_genres.extend(genres_list)
+    
+    genre_counts = Counter(all_genres)
+    
+    # Etapa 2: Codificar os gêneros usando MultiLabelBinarizer
+    mlb = MultiLabelBinarizer()
+    genres_encoded = mlb.fit_transform(df_new['genres'].apply(lambda x: x.strip('[]').replace("'", "").split(', ') if isinstance(x, str) else []))
+    genres_df_new = pd.DataFrame(genres_encoded, columns=mlb.classes_)
+    
+    # Etapa 3: Selecionar os 20 principais gêneros
+    top_20_genres_names = [genre for genre, count in genre_counts.most_common(20)]
+    top_20_genres_df_new = genres_df_new[top_20_genres_names]
+    
+    # Etapa 4: Concatenar com o DataFrame original
+    df_new_encoded = pd.concat([df_new, top_20_genres_df_new], axis=1)
+    
+    # Etapa 5: Processar gêneros menos frequentes
+    def process_genres(genres):
+        if pd.isna(genres):  # Verifica se o valor é NaN
+            return []
+        else:
+            return [genre for genre in genres.strip('[]').replace("'", "").split(', ') if genre not in top_20_genres_names]
+
+    df_new_encoded['other_genres'] = df_new_encoded['genres'].apply(process_genres)
+    df_new_exploded = df_new_encoded.explode('other_genres')
+    df_new_one_hot = pd.get_dummies(df_new_exploded['other_genres'])
+    df_new_encoded = df_new_encoded.join(df_new_one_hot.groupby(df_new_exploded.index).sum(), rsuffix='_onehot')
+    df_new_encoded = df_new_encoded.drop(columns=['other_genres'])
+
+    return df_new_encoded, top_20_genres_names
+
+df_new_encoded, top_20_genres_names = processar_generos(df_new)
+
+
+# Chame a função de processamento sem exibir na interface
+
+@st.cache_data
+def criar_grafico_contagem(df, categoria_col, title):
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.countplot(data=df, x=categoria_col, ax=ax, palette='viridis')
+    ax.set_title(title)
+    ax.set_xlabel(categoria_col)
+    ax.set_ylabel('Contagem')
+    return fig
+
+st.title('Exploração das Categorias dos Filmes')
+
+# Supõe-se que df_new_encoded já esteja carregado e processado
+df_new_encoded['release_year'] = df_new_encoded['release_year'].fillna(0).astype(int)
+
+# Criação da coluna 'decade'
+df_new_encoded['decade'] = (df_new_encoded['release_year'] // 10 * 10).astype(int)
+
+# Criação das categorias
+df_new_encoded['budget_category'] = pd.cut(df_new_encoded['budget'], bins=[0, 10000000, 50000000, 100000000, np.inf],
+                                           labels=['Baixo (0-10)', 'Médio (10-50)', 'Alto (50-100)', 'Muito Alto (>100)'])
+
+df_new_encoded['revenue_category'] = pd.cut(df_new_encoded['revenue'], bins=[0, 50000000, 200000000, 500000000, np.inf],
+                                            labels=['Baixa (0-50)', 'Média (50-200)', 'Alta (200-500)', 'Muito Alta (>500)'])
+
+df_new_encoded['popularity_category'] = pd.cut(df_new_encoded['popularity'], bins=[0, 10, 20, 50, np.inf],
+                                               labels=['Baixa (0-10)', 'Média (10-20)', 'Alta (20-50)', 'Muito Alta (>50)'])
+
+df_new_encoded['runtime_category'] = pd.cut(df_new_encoded['runtime'], bins=[0, 60, 120, 180, np.inf],
+                                            labels=['Curto (0-60)', 'Médio (60-120)', 'Longo (120-180)', 'Muito Longo (>180)'])
+
+df_new_encoded['vote_average_category'] = pd.cut(df_new_encoded['vote_average'], bins=[0, 5, 7, 8.5, 10],
+                                                labels=['Baixa (0-5)', 'Média (5-7)', 'Alta (7-8.5)', 'Muito Alta (8.5-10)'])
+
+df_new_encoded['vote_count_category'] = pd.cut(df_new_encoded['vote_count'], bins=[0, 100, 500, 1000, np.inf],
+                                              labels=['Baixo (0-100)', 'Médio (100-500)', 'Alto (500-1000)', 'Muito Alto (>1000)'])
+
+# Título da seção
+st.write("Distribuição das Categorias dos Filmes:")
+
+# Criar e exibir gráficos de contagem para cada categoria
+categorias = [
+    ('budget_category', 'Distribuição do Orçamento'),
+    ('revenue_category', 'Distribuição da Receita'),
+    ('popularity_category', 'Distribuição da Popularidade'),
+    ('runtime_category', 'Distribuição da Duração'),
+    ('vote_average_category', 'Distribuição da Avaliação Média'),
+    ('vote_count_category', 'Distribuição da Contagem de Votos')
+]
+
+for categoria_col, title in categorias:
+    if categoria_col in df_new_encoded.columns:
+        fig = criar_grafico_contagem(df_new_encoded, categoria_col, title)
+        st.pyplot(fig)
+    else:
+        st.write(f"Coluna {categoria_col} não encontrada no DataFrame.")
+    
+def process_data(df_new_encoded):
+    # Inicializar o MultiLabelBinarizer
+    mlb_language = MultiLabelBinarizer()
+
+    # Ajustar e transformar os idiomas originais
+    language_encoded = mlb_language.fit_transform(df['original_language'].apply(lambda x: [x] if isinstance(x, str) else []))
+
+    # Criar um novo DataFrame com os idiomas originais codificados
+    language_df = pd.DataFrame(language_encoded, columns=mlb_language.classes_)
+
+    # Concatenar o DataFrame original com os idiomas originais codificados
+    df_new_encoded = pd.concat([df_new_encoded, language_df], axis=1)
+    
+    # Contar a frequência de cada idioma original
+    language_counts = df_new_encoded['original_language'].value_counts()
+
+    # Obter as 20 principais línguas originais
+    top_20_languages = language_counts.head(20).index.tolist()
+
+    # Criar uma função para codificar os idiomas originais
+    def encode_language(language):
+        if language in top_20_languages:
+            return language
+        else:
+            return 'other'
+
+    # Aplicar a função para criar uma nova coluna com os idiomas codificados
+    df_new_encoded['encoded_language'] = df_new_encoded['original_language'].apply(encode_language)
+
+    # Aplicar o one-hot encoding na coluna 'encoded_language'
+    df_new_encoded = pd.get_dummies(df_new_encoded, columns=['encoded_language'], prefix=['language'])
+
+    # Criar uma função para processar a coluna 'original_language'
+    def process_language(language):
+        if pd.isna(language):  # Verifica se o valor é NaN
+            return []
+        else:
+            if language not in top_20_languages:
+                return [language]
+            else:
+                return []
+
+    # Cria uma nova coluna 'other_languages' para armazenar os idiomas menos frequentes
+    df_new_encoded['other_languages'] = df_new_encoded['original_language'].apply(process_language)
+
+    # Explode a coluna 'other_languages' para criar uma linha para cada idioma
+    df_exploded_language = df_new_encoded.explode('other_languages')
+
+    # Realiza o one-hot encoding na coluna 'other_languages'
+    df_new_encoded_one_hot_language = pd.get_dummies(df_exploded_language['other_languages'])
+
+    # Junta os dados one-hot encoded de volta ao DataFrame original com sufixos
+    df_new_encoded = df_new_encoded.join(df_new_encoded_one_hot_language.groupby(df_exploded_language.index).sum(), rsuffix='_onehot')
+
+    # Remove a coluna 'other_languages' original, se não for mais necessária
+    df_new_encoded = df_new_encoded.drop(columns=['other_languages'])
+    
+    return df_new_encoded
+
+df_new_encoded_before_normalization = df_new_encoded.copy()
+
+
+def process_and_scale_data(df_new_encoded):
+    # Inicializar os escalonadores
+    minmax_scaler = MinMaxScaler()
+    standard_scaler = StandardScaler()
+
+    # Normalizar as colunas
+    df_new_encoded[['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']] = minmax_scaler.fit_transform(
+        df_new_encoded[['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']]
+    )
+
+    # Padronizar as colunas
+    df_new_encoded[['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']] = standard_scaler.fit_transform(
+        df_new_encoded[['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']]
+    )
+    
+    return df_new_encoded
+
+st.title("Distribuição das Colunas Numéricas normalizadas")
+
+# Definir as colunas numéricas
+numerical_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
+
+# Exibir gráficos para cada coluna
+for col in numerical_cols:
+    st.subheader(f'Distribuição de {col} (Normalizado e Padronizado)')
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.histplot(df_new_encoded[col], kde=True, ax=ax)
+    ax.set_title(f'Distribuição de {col} (Normalizado e Padronizado)')
+    ax.set_xlabel(col)
+    ax.set_ylabel('Frequência')
+    st.pyplot(fig)
+    
+
+
+numeric_cols = df_new_encoded.select_dtypes(include=['number']).columns
+categorical_cols = df_new_encoded.select_dtypes(include=['object']).columns
+
+df_new_encoded[numeric_cols] = df_new_encoded[numeric_cols].fillna(df_new_encoded[numeric_cols].mean())
+
+# Preencher valores ausentes
+for col in categorical_cols:
+    mode = df_new_encoded[col].mode()[0]  # Pega a moda
+    df_new_encoded[col].fillna(mode, inplace=True)
+    
+X = df_new_encoded[numeric_cols]
+
+# Encontre o número ideal de clusters usando o método do cotovelo
+wcss = []
 for i in range(1, 11):
     kmeans = KMeans(n_clusters=i, random_state=42)
-    kmeans.fit(dados_clusterizacao)
-    inertia.append(kmeans.inertia_)
+    kmeans.fit(X)
+    wcss.append(kmeans.inertia_)
 
-plt.figure(figsize=(12, 6))
-plt.plot(range(1, 11), inertia, marker='o')
-plt.title('Método do Cotovelo')
-plt.xlabel('Número de Clusters')
-plt.ylabel('Soma dos Quadrados Intra-Clusters')
-st.pyplot(plt)
-st.write("O gráfico do cotovelo ajuda a visualizar o ponto em que a soma dos quadrados intra-cluster começa a estabilizar, sugerindo o número ideal de clusters.")
+# Plotar o gráfico do cotovelo usando o Streamlit
+st.title('Método do Cotovelo para Seleção de Clusters')
 
-silhouette_scores = []
-for i in range(2, 11):
-    kmeans = KMeans(n_clusters=i, random_state=42)
-    labels = kmeans.fit_predict(dados_clusterizacao)
-    silhouette_scores.append(silhouette_score(dados_clusterizacao, labels))
+fig, ax = plt.subplots()
+ax.plot(range(1, 11), wcss)
+ax.set_title('Método do Cotovelo')
+ax.set_xlabel('Número de Clusters')
+ax.set_ylabel('WCSS')
 
-plt.figure(figsize=(12, 6))
-plt.plot(range(2, 11), silhouette_scores, marker='o')
-plt.title('Análise da Silhueta')
-plt.xlabel('Número de Clusters')
-plt.ylabel('Coeficiente de Silhueta')
-st.pyplot(plt)
-st.write("O gráfico da silhueta fornece uma análise adicional sobre o número de clusters, similar ao gráfico anterior.")
+st.pyplot(fig)
 
-# Criar o modelo KMeans com o número de clusters escolhido
-st.markdown("### Resultados Finais da Clusterização")
-kmeans = KMeans(n_clusters=num_clusters, random_state=42)
-df_amostra['cluster'] = kmeans.fit_predict(dados_clusterizacao)
+n_clusters = 4
 
-# Analisar e visualizar os clusters
-st.write("Contagem de filmes por cluster:")
-st.write(df_amostra.groupby('cluster')['title'].count())
+# Aplicar o KMeans com o número de clusters escolhido
+kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+kmeans.fit(X)
 
-plt.figure(figsize=(16, 12))
-sns.scatterplot(x='runtime', y='vote_average', hue='cluster', data=df_amostra, palette='viridis', s=100)
-plt.title('Clusters de Filmes')
-plt.xlabel('Tempo de execução (Padronizado)')
-plt.ylabel('Votação (Padronizada)')
-st.pyplot(plt)
-st.write("O gráfico final mostra a distribuição dos clusters com base em 'runtime' e 'vote_average'.")
+# Adicionar a coluna de clusters ao DataFrame
+df_new_encoded['cluster'] = kmeans.labels_
+
+# Selecionar as colunas para o gráfico de dispersão
+x_col = 'popularity'
+y_col = 'vote_average'
+
+# Criar o gráfico de dispersão com a clusterização
+fig = px.scatter(df_new_encoded, x=x_col, y=y_col, color='cluster',
+                  title=f'Clusterização com base em {x_col} e {y_col}')
+
+# Exibir o gráfico no Streamlit
+st.title("Visualização de Clusterização")
+st.plotly_chart(fig)
+
+
+
+
+
+
+
+
+
+silhouette_avg = silhouette_score(X, kmeans.labels_)
+print(f"Silhouette Score: {silhouette_avg}")
+
+# Calcular os coeficientes de silhueta para cada amostra
+sample_silhouette_values = silhouette_samples(X, kmeans.labels_)
+
+# Criar o gráfico de silhueta
+fig, ax = plt.subplots(figsize=(12, 8))
+
+# Plotar o gráfico de silhueta para cada cluster
+y_lower = 10
+for i in range(n_clusters):
+    ith_cluster_silhouette_values = sample_silhouette_values[kmeans.labels_ == i]
+    ith_cluster_silhouette_values.sort()
+
+    size_cluster_i = ith_cluster_silhouette_values.shape[0]
+    y_upper = y_lower + size_cluster_i
+
+    color = cm.nipy_spectral(float(i) / n_clusters)
+    ax.fill_betweenx(
+        np.arange(y_lower, y_upper),
+        0,
+        ith_cluster_silhouette_values,
+        facecolor=color,
+        edgecolor=color,
+        alpha=0.7,
+    )
+
+    ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+    y_lower = y_upper + 10
+
+ax.set_title("Gráfico de Silhueta")
+ax.set_xlabel("Coeficiente de Silhueta")
+ax.set_ylabel("Cluster")
+
+# Linha vertical indicando o valor médio da silhueta
+ax.axvline(x=silhouette_avg, color="red", linestyle="--")
+
+ax.set_yticks([])
+ax.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
+
+plt.show()
+
+
+cluster_stats = df_new_encoded.groupby('cluster').agg({
+    'popularity': 'mean',
+    'budget': 'mean',
+    'revenue': 'mean',
+    'runtime': 'mean',
+    'vote_average': 'mean',
+    'vote_count': 'mean'
+}).reset_index()
+
+# Exibir as estatísticas de cada cluster no Streamlit com estilo
+st.write("### Estatísticas por Cluster")
+st.dataframe(cluster_stats.style.format("{:.2f}").background_gradient(cmap='Blues'))
+
+# Criar o gráfico de barras interativo utilizando o Plotly
+fig = px.bar(cluster_stats, 
+             x='cluster', 
+             y=['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count'], 
+             title='Estatísticas dos Clusters', 
+             labels={'value': 'Média', 'variable': 'Métrica'},
+             barmode='group',
+             color_discrete_sequence=px.colors.qualitative.Vivid)
+
+# Configurar o layout do gráfico para melhor visualização
+fig.update_layout(xaxis_title="Cluster", yaxis_title="Média", legend_title="Métrica")
+
+# Mostrar o gráfico interativo no Streamlit
+st.plotly_chart(fig)
+
+
+
+
+
+
+
+
+
+
+
+
+
+from sklearn.cluster import KMeans
+
+# Exemplo: Criando clusters para 'top_20_genres_names'
+kmeans = KMeans(n_clusters=4, random_state=42)
+df_new_encoded['cluster'] = kmeans.fit_predict(df_new_encoded[top_20_genres_names])
+
+# Agrupar por cluster e somar os gêneros
+genre_counts_by_cluster = df_new_encoded.groupby('cluster')[top_20_genres_names].sum()
+
+# Transpor o DataFrame para que os gêneros sejam as linhas e os clusters as colunas
+genre_counts_by_cluster = genre_counts_by_cluster.T
+
+# Converter o DataFrame transposto em um formato adequado para plotagem com Plotly
+genre_counts_by_cluster = genre_counts_by_cluster.reset_index()
+genre_counts_by_cluster = pd.melt(genre_counts_by_cluster, id_vars='index', var_name='Cluster', value_name='Count')
+
+# Criar o gráfico de barras interativo utilizando o Plotly
+fig = px.bar(genre_counts_by_cluster, 
+             x='index', 
+             y='Count', 
+             color='Cluster', 
+             title='Gêneros por Cluster',
+             labels={'index': 'Gêneros', 'Count': 'Contagem'},
+             barmode='group',
+             color_discrete_sequence=px.colors.qualitative.Vivid)
+
+# Configurar o layout do gráfico
+fig.update_layout(xaxis_title="Gêneros", yaxis_title="Contagem", legend_title="Cluster")
+fig.update_xaxes(tickangle=45)
+
+# Exibir o gráfico interativo no Streamlit
+st.plotly_chart(fig)
+
+categorical_cols = ['budget_category', 'revenue_category', 'popularity_category', 'runtime_category', 'vote_average_category', 'vote_count_category']
+
+# Crie um gráfico de barras para cada coluna categórica
+for col in categorical_cols:
+    fig = px.histogram(df_new_encoded, x=col, color='cluster', barmode='group',
+                       title=f'Distribuição de {col} por Cluster')
+    
+    # Exibir o gráfico no Streamlit
+    st.plotly_chart(fig)
+    
+numeric_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
+
+# Crie o boxplot para cada coluna numérica
+for col in numeric_cols:
+    fig = px.box(df_new_encoded, x='cluster', y=col, color='cluster',
+                 title=f'Comparação de Distribuições de {col} por Cluster')
+    
+    # Exiba o gráfico no Streamlit
+    st.plotly_chart(fig)
+    
+
+fig = px.scatter(df_new_encoded, x='release_year', y='popularity', color='cluster',
+                 title='Ano de Lançamento em Relação aos Clusters')
+
+# Exiba o gráfico no Streamlit
+st.plotly_chart(fig)
+
+
+
+
+
+
+
+
+
+
+# st.title("Exploração dos resultados com valores originais")
+
+# kmeans = KMeans(n_clusters=4, random_state=42)
+# df_new_encoded_before_normalization['cluster'] = kmeans.fit_predict(df_new_encoded_before_normalization[top_20_genres_names])
+
+# # Agrupar o DataFrame por cluster e contar a frequência de cada gênero em cada cluster
+# genre_counts_by_cluster = df_new_encoded_before_normalization.groupby('cluster')[top_20_genres_names].sum()
+
+# # Criar uma nova coluna com a soma dos gêneros em cada cluster
+# genre_counts_by_cluster['total_genres'] = genre_counts_by_cluster.sum(axis=1)
+
+# # Criar uma nova coluna com a proporção de cada gênero em cada cluster
+# for genre in top_20_genres_names:
+#     genre_counts_by_cluster[f'{genre}_proportion'] = genre_counts_by_cluster[genre] / genre_counts_by_cluster['total_genres']
+
+# # Exibir o DataFrame com a nova coluna
+# st.write("### Proporção de Gêneros por Cluster")
+# st.dataframe(genre_counts_by_cluster.style.format("{:.2f}").background_gradient(cmap='Blues'))
+
+# # Agrupar o DataFrame por cluster e calcular a média de algumas colunas
+# cluster_stats = df_new_encoded_before_normalization.groupby('cluster').agg({
+#     'popularity': 'mean',
+#     'budget': 'mean',
+#     'revenue': 'mean',
+#     'runtime': 'mean',
+#     'vote_average': 'mean',
+#     'vote_count': 'mean'
+# })
+
+# # Exibir as estatísticas de cada cluster
+# st.write("### Estatísticas dos Clusters")
+# fig, ax = plt.subplots(figsize=(12, 8))
+# cluster_stats.plot(kind='bar', ax=ax)
+# ax.set_title('Estatísticas dos Clusters')
+# ax.set_xlabel('Cluster')
+# ax.set_ylabel('Média')
+# ax.set_xticks(range(len(cluster_stats.index)))
+# ax.set_xticklabels(cluster_stats.index, rotation=0)
+# ax.legend(loc='best')
+# plt.tight_layout()
+# st.pyplot(fig)
+
+# # Agrupar o DataFrame por cluster e contar a frequência de cada gênero em cada cluster
+# genre_counts_by_cluster = df_new_encoded_before_normalization.groupby('cluster')[top_20_genres_names].sum()
+
+# # Transpor o DataFrame para que os gêneros sejam as linhas e os clusters as colunas
+# genre_counts_by_cluster = genre_counts_by_cluster.T
+
+# # Criar o gráfico de barras
+# fig = px.bar(genre_counts_by_cluster, 
+#              x=genre_counts_by_cluster.index, 
+#              y=genre_counts_by_cluster.columns,
+#              title='Gêneros por Cluster',
+#              labels={'x': 'Gêneros', 'value': 'Contagem', 'variable': 'Cluster'},
+#              barmode='group',
+#              color_discrete_sequence=px.colors.qualitative.Plotly)
+# st.plotly_chart(fig)
+
+# # Selecione as colunas categóricas para plotar
+# categorical_cols = ['budget_category', 'revenue_category', 'popularity_category', 'runtime_category', 'vote_average_category', 'vote_count_category']
+
+# # Crie um gráfico de barras para cada coluna categórica
+# for col in categorical_cols:
+#     fig = px.histogram(df_new_encoded_before_normalization, x=col, color='cluster', barmode='group',
+#                        title=f'Distribuição de {col} por Cluster')
+#     st.plotly_chart(fig)
+
+# # Selecione as colunas numéricas para o boxplot
+# numeric_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
+
+# # Crie o boxplot para cada coluna numérica
+# for col in numeric_cols:
+#     fig = px.box(df_new_encoded_before_normalization, x='cluster', y=col, color='cluster',
+#                  title=f'Comparação de Distribuições de {col} por Cluster')
+#     st.plotly_chart(fig)
