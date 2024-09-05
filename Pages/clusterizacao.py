@@ -13,6 +13,7 @@ from sklearn.metrics import silhouette_samples
 import matplotlib.cm as cm
 import streamlit as st
 import pandas as pd
+
 st.title('Exploração do Dataset de Filmes')
 
 # Caminho do arquivo CSV local
@@ -26,14 +27,13 @@ st.write("Amostra de 5.000 registros do dataset:")
 df_sample = df.sample(n=5000)
 st.dataframe(df_sample)
 
+df_sample_no_nulls = df_sample.dropna()
+
 # Exibir as dimensões do DataFrame
 st.write("Dimensões do dataset amostrado:", df_sample.shape)
 
 # Seleção das colunas desejadas
-df_new = df_sample[['title', 'genres', 'original_language', 'popularity', 'release_date',
-                    'budget', 'revenue', 'runtime', 'vote_average', 'vote_count',
-                    'production_companies', 'recommendations', 'overview']]
-
+df_new = df_sample_no_nulls[['title','genres', 'original_language','popularity','release_date', 'budget', 'revenue', 'runtime','vote_average', 'vote_count','production_companies','recommendations','overview']]
 # Conversão de 'release_date' para datetime
 # Crie uma cópia do DataFrame, se necessário
 # Convertendo 'release_date' para datetime e lidando com erros
@@ -50,9 +50,6 @@ print(df_new['release_date'].dtype)
 df_new['release_year'] = df_new['release_date'].dt.year
 
 
-# Exibir o DataFrame transformado
-st.write("Dados transformados com ano de lançamento:")
-st.dataframe(df_new)
 
 
 
@@ -60,15 +57,6 @@ st.dataframe(df_new)
 def get_sample_data(df_new, sample_size=5000):
     return df.sample(n=sample_size)
 
-# Função para criar o histograma
-@st.cache_data
-def criar_histograma(df, col):
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.histplot(df[col].dropna(), kde=True, ax=ax)  # Remove valores ausentes
-    ax.set_title(f'Distribuição de {col}')
-    ax.set_xlabel(col)
-    ax.set_ylabel('Frequência')
-    return fig
 
 # Substitua `df_new` pelo DataFrame que você estiver usando
 df_sample = get_sample_data(df_new)
@@ -76,24 +64,7 @@ df_sample = get_sample_data(df_new)
 # Colunas numéricas que deseja analisar
 numerical_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
 
-# Garantir que todas as colunas numéricas estejam presentes no DataFrame amostrado
-numerical_cols = [col for col in numerical_cols if col in df_sample.columns]
 
-# Título da seção
-st.write("Distribuição das colunas numéricas:")
-
-# Gerar e exibir os gráficos para cada coluna numérica
-for col in numerical_cols:
-    if col in df_sample.columns:
-        st.write(f"**Distribuição de {col}**")
-        
-        # Criar o gráfico com dados amostrados
-        fig = criar_histograma(df_sample, col)
-        
-        # Exibir o gráfico no Streamlit
-        st.pyplot(fig)
-    else:
-        st.write(f"Coluna {col} não encontrada no DataFrame amostrado.")
     
 def preprocess_data(df_new):
     # Preencher valores ausentes nas colunas numéricas
@@ -112,6 +83,67 @@ def preprocess_data(df_new):
     df_new.loc[:, 'overview'] = df_new['overview'].fillna("No overview available")
     
     return df_new
+
+import streamlit as st
+import pandas as pd
+
+# Supondo que você já tenha carregado seu DataFrame df_new
+# df_new = pd.read_csv('path/to/your/file.csv')
+
+def adjust_budget_for_inflation(row):
+    """
+    Ajuste o orçamento para a inflação com base no ano de lançamento.
+    """
+    base_year = 2023  # Ano base para o reajuste
+    inflation_rate = 0.03  # Taxa de inflação média anual (ajuste conforme necessário)
+    
+    year_diff = base_year - row['release_year']
+    adjusted_budget = row['budget'] * (1 + inflation_rate) ** year_diff
+    return adjusted_budget
+
+# Aplicar a função para ajustar o orçamento
+df_new['adjusted_budget'] = df_new.apply(adjust_budget_for_inflation, axis=1)
+
+# Visualizar o resultado no console
+print(df_new[['title', 'budget', 'release_year', 'adjusted_budget']].head())
+
+# Configuração do Streamlit
+
+import streamlit as st
+import plotly.express as px
+import pandas as pd
+
+
+
+# Ajustar orçamento para a inflação (se necessário)
+def adjust_budget_for_inflation(row):
+    base_year = 2023  # Ano base para o reajuste
+    inflation_rate = 0.03  # Taxa de inflação média anual (ajuste conforme necessário)
+    year_diff = base_year - row['release_year']
+    adjusted_budget = row['budget'] * (1 + inflation_rate) ** year_diff
+    return adjusted_budget
+
+df_new['adjusted_budget'] = df_new.apply(adjust_budget_for_inflation, axis=1)
+
+# Criar o gráfico de dispersão
+fig = px.scatter(df_new, 
+                 x="release_year", 
+                 y="adjusted_budget", 
+                 color="budget",
+                 hover_data=["title", "budget", "adjusted_budget"],
+                 labels={"adjusted_budget": "Adjusted Budget", "release_year": "Release Year"},
+                 title="Adjusted Budget vs. Release Year",
+                 color_continuous_scale=px.colors.sequential.Plasma)  # Usar paleta Plasma
+
+fig.update_layout(
+    xaxis_title="Release Year",
+    yaxis_title="Adjusted Budget (in USD)",
+    hovermode="x unified"
+)
+
+# Configuração do Streamlit
+st.title("Gráfico de Orçamento Ajustado vs. Ano de Lançamento:")
+st.plotly_chart(fig)
 
 @st.cache_data
 def processar_generos(df_new):
@@ -154,19 +186,6 @@ def processar_generos(df_new):
 df_new_encoded, top_20_genres_names = processar_generos(df_new)
 
 
-# Chame a função de processamento sem exibir na interface
-
-@st.cache_data
-def criar_grafico_contagem(df, categoria_col, title):
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.countplot(data=df, x=categoria_col, ax=ax, palette='viridis')
-    ax.set_title(title)
-    ax.set_xlabel(categoria_col)
-    ax.set_ylabel('Contagem')
-    return fig
-
-st.title('Exploração das Categorias dos Filmes')
-
 # Supõe-se que df_new_encoded já esteja carregado e processado
 df_new_encoded['release_year'] = df_new_encoded['release_year'].fillna(0).astype(int)
 
@@ -174,7 +193,7 @@ df_new_encoded['release_year'] = df_new_encoded['release_year'].fillna(0).astype
 df_new_encoded['decade'] = (df_new_encoded['release_year'] // 10 * 10).astype(int)
 
 # Criação das categorias
-df_new_encoded['budget_category'] = pd.cut(df_new_encoded['budget'], bins=[0, 10000000, 50000000, 100000000, np.inf],
+df_new_encoded['budget_category'] = pd.cut(df_new_encoded['adjusted_budget'], bins=[0, 10000000, 50000000, 100000000, np.inf],
                                            labels=['Baixo (0-10)', 'Médio (10-50)', 'Alto (50-100)', 'Muito Alto (>100)'])
 
 df_new_encoded['revenue_category'] = pd.cut(df_new_encoded['revenue'], bins=[0, 50000000, 200000000, 500000000, np.inf],
@@ -193,7 +212,6 @@ df_new_encoded['vote_count_category'] = pd.cut(df_new_encoded['vote_count'], bin
                                               labels=['Baixo (0-100)', 'Médio (100-500)', 'Alto (500-1000)', 'Muito Alto (>1000)'])
 
 # Título da seção
-st.write("Distribuição das Categorias dos Filmes:")
 
 # Criar e exibir gráficos de contagem para cada categoria
 categorias = [
@@ -205,12 +223,12 @@ categorias = [
     ('vote_count_category', 'Distribuição da Contagem de Votos')
 ]
 
-for categoria_col, title in categorias:
-    if categoria_col in df_new_encoded.columns:
-        fig = criar_grafico_contagem(df_new_encoded, categoria_col, title)
-        st.pyplot(fig)
-    else:
-        st.write(f"Coluna {categoria_col} não encontrada no DataFrame.")
+# for categoria_col, title in categorias:
+#     if categoria_col in df_new_encoded.columns:
+#         fig = criar_grafico_contagem(df_new_encoded, categoria_col, title)
+#         st.pyplot(fig)
+#     else:
+#         st.write(f"Coluna {categoria_col} não encontrada no DataFrame.")
     
 def process_data(df_new_encoded):
     # Inicializar o MultiLabelBinarizer
@@ -280,31 +298,19 @@ def process_and_scale_data(df_new_encoded):
     standard_scaler = StandardScaler()
 
     # Normalizar as colunas
-    df_new_encoded[['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']] = minmax_scaler.fit_transform(
+    df_new_encoded[['popularity', 'budget', 'adjusted_budget', 'revenue', 'runtime', 'vote_average', 'vote_count']] = minmax_scaler.fit_transform(
         df_new_encoded[['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']]
     )
 
     # Padronizar as colunas
-    df_new_encoded[['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']] = standard_scaler.fit_transform(
-        df_new_encoded[['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']]
+    df_new_encoded[['popularity', 'budget', 'adjusted_budget', 'revenue', 'runtime', 'vote_average', 'vote_count']] = standard_scaler.fit_transform(
+        df_new_encoded[['popularity', 'budget', 'adjusted_budget', 'revenue', 'runtime', 'vote_average', 'vote_count']]
     )
     
     return df_new_encoded
 
-st.title("Distribuição das Colunas Numéricas normalizadas")
 
-# Definir as colunas numéricas
-numerical_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
 
-# Exibir gráficos para cada coluna
-for col in numerical_cols:
-    st.subheader(f'Distribuição de {col} (Normalizado e Padronizado)')
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.histplot(df_new_encoded[col], kde=True, ax=ax)
-    ax.set_title(f'Distribuição de {col} (Normalizado e Padronizado)')
-    ax.set_xlabel(col)
-    ax.set_ylabel('Frequência')
-    st.pyplot(fig)
     
 
 
@@ -336,12 +342,12 @@ ax.set_title('Método do Cotovelo')
 ax.set_xlabel('Número de Clusters')
 ax.set_ylabel('WCSS')
 
-st.pyplot(fig)
+st.plotly_chart(fig)
 
 n_clusters = 4
 
 # Aplicar o KMeans com o número de clusters escolhido
-kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+kmeans = KMeans(n_clusters=n_clusters)
 kmeans.fit(X)
 
 # Adicionar a coluna de clusters ao DataFrame
@@ -353,11 +359,16 @@ y_col = 'vote_average'
 
 # Criar o gráfico de dispersão com a clusterização
 fig = px.scatter(df_new_encoded, x=x_col, y=y_col, color='cluster',
-                  title=f'Clusterização com base em {x_col} e {y_col}')
+                  title=f'Clusterização com base em {x_col} e {y_col}',color_continuous_scale=px.colors.sequential.Plasma)
 
 # Exibir o gráfico no Streamlit
 st.title("Visualização de Clusterização")
 st.plotly_chart(fig)
+
+
+
+
+
 
 
 
@@ -412,6 +423,19 @@ ax.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
 st.pyplot(fig)
 
 
+
+
+
+st.title("Exploração dos resultados")
+
+import streamlit as st
+import plotly.express as px
+import pandas as pd
+
+# Supondo que você já tenha carregado seu DataFrame df_new_encoded
+# df_new_encoded = pd.read_csv('path/to/your/file.csv')
+
+# Agrupar o DataFrame por cluster e calcular a média de algumas colunas
 cluster_stats = df_new_encoded.groupby('cluster').agg({
     'popularity': 'mean',
     'budget': 'mean',
@@ -421,95 +445,145 @@ cluster_stats = df_new_encoded.groupby('cluster').agg({
     'vote_count': 'mean'
 }).reset_index()
 
-# Exibir as estatísticas de cada cluster no Streamlit com estilo
-st.write("### Estatísticas por Cluster")
-st.dataframe(cluster_stats.style.format("{:.2f}").background_gradient(cmap='Blues'))
-
-# Criar o gráfico de barras interativo utilizando o Plotly
+# Criar um gráfico de barras empilhadas interativo
 fig = px.bar(cluster_stats, 
              x='cluster', 
              y=['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count'], 
-             title='Estatísticas dos Clusters', 
-             labels={'value': 'Média', 'variable': 'Métrica'},
-             barmode='group',
-             color_discrete_sequence=px.colors.qualitative.Vivid)
+             title='Estatísticas dos Clusters',
+             labels={'value': 'Média', 'cluster': 'Cluster'},
+             height=500,  # altura ajustada
+             width=800,color_discrete_sequence=px.colors.qualitative.Plotly)   # largura ajustada
 
-# Configurar o layout do gráfico para melhor visualização
-fig.update_layout(xaxis_title="Cluster", yaxis_title="Média", legend_title="Métrica")
+# Configurar para barras empilhadas
+fig.update_layout(barmode='stack')
 
-# Mostrar o gráfico interativo no Streamlit
+# Configuração do Streamlit
+st.write("Gráfico das Estatísticas dos Clusters:")
 st.plotly_chart(fig)
 
 
-
-
-
-
-
-
-
-
-
-
-
-from sklearn.cluster import KMeans
-
-# Exemplo: Criando clusters para 'top_20_genres_names'
-kmeans = KMeans(n_clusters=4, random_state=42)
-df_new_encoded['cluster'] = kmeans.fit_predict(df_new_encoded[top_20_genres_names])
-
-# Agrupar por cluster e somar os gêneros
 genre_counts_by_cluster = df_new_encoded.groupby('cluster')[top_20_genres_names].sum()
 
 # Transpor o DataFrame para que os gêneros sejam as linhas e os clusters as colunas
-genre_counts_by_cluster = genre_counts_by_cluster.T
+genre_counts_by_cluster = genre_counts_by_cluster.T.reset_index()
 
-# Converter o DataFrame transposto em um formato adequado para plotagem com Plotly
-genre_counts_by_cluster = genre_counts_by_cluster.reset_index()
-genre_counts_by_cluster = pd.melt(genre_counts_by_cluster, id_vars='index', var_name='Cluster', value_name='Count')
-
-# Criar o gráfico de barras interativo utilizando o Plotly
+# Criar o gráfico de barras empilhadas interativo
 fig = px.bar(genre_counts_by_cluster, 
              x='index', 
-             y='Count', 
-             color='Cluster', 
+             y=genre_counts_by_cluster.columns[1:], 
              title='Gêneros por Cluster',
-             labels={'index': 'Gêneros', 'Count': 'Contagem'},
-             barmode='group',
-             color_discrete_sequence=px.colors.qualitative.Vivid)
+             labels={'index': 'Gêneros', 'value': 'Quantidade'},
+             height=500,  # Altura ajustada
+             width=900,   # Largura ajustada
+             color_discrete_sequence=px.colors.qualitative.Plotly)  # Manter padrão de cor
 
-# Configurar o layout do gráfico
-fig.update_layout(xaxis_title="Gêneros", yaxis_title="Contagem", legend_title="Cluster")
-fig.update_xaxes(tickangle=45)
+# Configurar para barras empilhadas
+fig.update_layout(barmode='stack')
 
-# Exibir o gráfico interativo no Streamlit
+# Ajustar a rotação dos rótulos do eixo x
+fig.update_xaxes(tickangle=-40)
+
+# Configuração do Streamlit
+st.write("Gráfico de Gêneros por Cluster:")
 st.plotly_chart(fig)
 
+import streamlit as st
+import plotly.express as px
+import pandas as pd
+
+# Supondo que você já tenha carregado seu DataFrame df_new_encoded
+# df_new_encoded = pd.read_csv('path/to/your/file.csv')
+
+# Lista de colunas categóricas
 categorical_cols = ['budget_category', 'revenue_category', 'popularity_category', 'runtime_category', 'vote_average_category', 'vote_count_category']
 
-# Crie um gráfico de barras para cada coluna categórica
+# Iterar sobre cada coluna categórica e criar gráficos de barras empilhadas
 for col in categorical_cols:
-    fig = px.histogram(df_new_encoded, x=col, color='cluster', barmode='group',
-                       title=f'Distribuição de {col} por Cluster')
+    fig = px.histogram(df_new_encoded, 
+                       x=col, 
+                       color='cluster', 
+                       barmode='stack',  # Barras empilhadas por cluster
+                       title=f'Distribuição de {col.replace("_", " ").title()} por Cluster',
+                       labels={col: col.replace('_', ' ').title(), 'count': 'Contagem'},
+                       color_discrete_sequence=px.colors.qualitative.Plotly,  # Manter padrão de cor
+                       height=500,  # Altura ajustada
+                       width=900)   # Largura ajustada
+
+    # Exibir o gráfico no Streamlit
+    st.write(f"Gráfico de Distribuição para {col.replace('_', ' ').title()}:")
+    st.plotly_chart(fig)
+
+import streamlit as st
+import plotly.express as px
+import pandas as pd
+
+# Supondo que você já tenha carregado seu DataFrame df_new_encoded
+# df_new_encoded = pd.read_csv('path/to/your/file.csv')
+
+# Lista de colunas numéricas
+numeric_cols = ['popularity', 'adjusted_budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
+
+# Iterar sobre cada coluna numérica e criar boxplots
+for col in numeric_cols:
+    fig = px.box(df_new_encoded, 
+                 x='cluster', 
+                 y=col, 
+                 color='cluster',
+                 title=f'Comparação de Distribuições de {col.replace("_", " ").title()} por Cluster')
     
     # Exibir o gráfico no Streamlit
+    st.write(f"Boxplot para {col.replace('_', ' ').title()}:")
     st.plotly_chart(fig)
-    
-numeric_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
 
-# Crie o boxplot para cada coluna numérica
-for col in numeric_cols:
-    fig = px.box(df_new_encoded, x='cluster', y=col, color='cluster',
-                 title=f'Comparação de Distribuições de {col} por Cluster')
-    
-    # Exiba o gráfico no Streamlit
-    st.plotly_chart(fig)
-    
+import streamlit as st
+import plotly.express as px
+import pandas as pd
 
-fig = px.scatter(df_new_encoded, x='release_year', y='popularity', color='cluster',
+# Supondo que você já tenha carregado seu DataFrame df_new_encoded
+# df_new_encoded = pd.read_csv('path/to/your/file.csv')
+
+# Criar o gráfico de dispersão
+fig = px.scatter(df_new_encoded, 
+                 x='release_year', 
+                 y='popularity', 
+                 color='cluster',
                  title='Ano de Lançamento em Relação aos Clusters')
 
-# Exiba o gráfico no Streamlit
+# Exibir o gráfico no Streamlit
+st.write("Gráfico de Dispersão: Ano de Lançamento em Relação aos Clusters")
+st.plotly_chart(fig)
+
+
+import streamlit as st
+import plotly.express as px
+import pandas as pd
+
+# Supondo que você já tenha carregado seu DataFrame df_new_encoded
+# df_new_encoded = pd.read_csv('path/to/your/file.csv')
+
+# Agrupar por ano e cluster para calcular a média das colunas numéricas
+trend_stats = df_new_encoded.groupby(['release_year', 'cluster']).agg({
+    'popularity': 'mean',
+    'budget': 'mean',
+    'revenue': 'mean',
+    'runtime': 'mean',
+    'vote_average': 'mean',
+    'vote_count': 'mean'
+}).reset_index()
+
+# Criar o gráfico de linha para visualizar a tendência ao longo dos anos por cluster
+fig = px.line(trend_stats, 
+              x='release_year', 
+              y='popularity',  # Altere essa coluna para outras variáveis que deseja explorar
+              color='cluster', 
+              title='Tendência de Popularidade por Cluster ao Longo dos Anos',
+              labels={'release_year': 'Ano', 'popularity': 'Média de Popularidade'},
+              color_discrete_sequence=px.colors.qualitative.Plotly,
+              height=500, 
+              width=900)
+
+# Exibir o gráfico no Streamlit
+st.write("Gráfico de Tendência de Popularidade por Cluster ao Longo dos Anos")
 st.plotly_chart(fig)
 
 
@@ -521,78 +595,27 @@ st.plotly_chart(fig)
 
 
 
-# st.title("Exploração dos resultados com valores originais")
 
-# kmeans = KMeans(n_clusters=4, random_state=42)
-# df_new_encoded_before_normalization['cluster'] = kmeans.fit_predict(df_new_encoded_before_normalization[top_20_genres_names])
 
-# # Agrupar o DataFrame por cluster e contar a frequência de cada gênero em cada cluster
-# genre_counts_by_cluster = df_new_encoded_before_normalization.groupby('cluster')[top_20_genres_names].sum()
 
-# # Criar uma nova coluna com a soma dos gêneros em cada cluster
-# genre_counts_by_cluster['total_genres'] = genre_counts_by_cluster.sum(axis=1)
 
-# # Criar uma nova coluna com a proporção de cada gênero em cada cluster
-# for genre in top_20_genres_names:
-#     genre_counts_by_cluster[f'{genre}_proportion'] = genre_counts_by_cluster[genre] / genre_counts_by_cluster['total_genres']
 
-# # Exibir o DataFrame com a nova coluna
-# st.write("### Proporção de Gêneros por Cluster")
-# st.dataframe(genre_counts_by_cluster.style.format("{:.2f}").background_gradient(cmap='Blues'))
 
-# # Agrupar o DataFrame por cluster e calcular a média de algumas colunas
-# cluster_stats = df_new_encoded_before_normalization.groupby('cluster').agg({
-#     'popularity': 'mean',
-#     'budget': 'mean',
-#     'revenue': 'mean',
-#     'runtime': 'mean',
-#     'vote_average': 'mean',
-#     'vote_count': 'mean'
-# })
 
-# # Exibir as estatísticas de cada cluster
-# st.write("### Estatísticas dos Clusters")
-# fig, ax = plt.subplots(figsize=(12, 8))
-# cluster_stats.plot(kind='bar', ax=ax)
-# ax.set_title('Estatísticas dos Clusters')
-# ax.set_xlabel('Cluster')
-# ax.set_ylabel('Média')
-# ax.set_xticks(range(len(cluster_stats.index)))
-# ax.set_xticklabels(cluster_stats.index, rotation=0)
-# ax.legend(loc='best')
-# plt.tight_layout()
-# st.pyplot(fig)
 
-# # Agrupar o DataFrame por cluster e contar a frequência de cada gênero em cada cluster
-# genre_counts_by_cluster = df_new_encoded_before_normalization.groupby('cluster')[top_20_genres_names].sum()
 
-# # Transpor o DataFrame para que os gêneros sejam as linhas e os clusters as colunas
-# genre_counts_by_cluster = genre_counts_by_cluster.T
 
-# # Criar o gráfico de barras
-# fig = px.bar(genre_counts_by_cluster, 
-#              x=genre_counts_by_cluster.index, 
-#              y=genre_counts_by_cluster.columns,
-#              title='Gêneros por Cluster',
-#              labels={'x': 'Gêneros', 'value': 'Contagem', 'variable': 'Cluster'},
-#              barmode='group',
-#              color_discrete_sequence=px.colors.qualitative.Plotly)
-# st.plotly_chart(fig)
 
-# # Selecione as colunas categóricas para plotar
-# categorical_cols = ['budget_category', 'revenue_category', 'popularity_category', 'runtime_category', 'vote_average_category', 'vote_count_category']
 
-# # Crie um gráfico de barras para cada coluna categórica
-# for col in categorical_cols:
-#     fig = px.histogram(df_new_encoded_before_normalization, x=col, color='cluster', barmode='group',
-#                        title=f'Distribuição de {col} por Cluster')
-#     st.plotly_chart(fig)
 
-# # Selecione as colunas numéricas para o boxplot
-# numeric_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
 
-# # Crie o boxplot para cada coluna numérica
-# for col in numeric_cols:
-#     fig = px.box(df_new_encoded_before_normalization, x='cluster', y=col, color='cluster',
-#                  title=f'Comparação de Distribuições de {col} por Cluster')
-#     st.plotly_chart(fig)
+
+
+
+
+
+
+
+
+
+
