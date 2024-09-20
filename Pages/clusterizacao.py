@@ -13,6 +13,8 @@ from sklearn.metrics import silhouette_samples
 import matplotlib.cm as cm
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
+
 
 st.title('Exploração do Dataset de Filmes')
 
@@ -47,9 +49,6 @@ print(df_new['release_date'].dtype)
 df_new['release_year'] = df_new['release_date'].dt.year
 
 
-
-
-
 @st.cache_data
 def get_sample_data(df_new, sample_size=5000, random_state=42):
     return df.sample(n=sample_size)
@@ -81,8 +80,6 @@ def preprocess_data(df_new):
     
     return df_new
 
-import streamlit as st
-import pandas as pd
 
 def adjust_budget_for_inflation(row):
     """
@@ -103,11 +100,6 @@ print(df_new[['title', 'budget', 'release_year', 'adjusted_budget']].head())
 
 # Configuração do Streamlit
 
-import streamlit as st
-import plotly.express as px
-import pandas as pd
-
-
 
 # Ajustar orçamento para a inflação (se necessário)
 def adjust_budget_for_inflation(row):
@@ -118,16 +110,6 @@ def adjust_budget_for_inflation(row):
     return adjusted_budget
 
 df_new['adjusted_budget'] = df_new.apply(adjust_budget_for_inflation, axis=1)
-
-
-
-import streamlit as st
-import plotly.graph_objects as go
-import pandas as pd
-
-
-
-import plotly.express as px
 
 
 # Criando o gráfico scatter
@@ -338,12 +320,13 @@ kmeans.fit(X)
 df_new_encoded['cluster'] = kmeans.labels_
 
 # Selecionar as colunas para o gráfico de dispersão
-x_col = 'popularity'
-y_col = 'vote_average'
-
-# Criar o gráfico de dispersão com a clusterização
-fig = px.scatter(df_new_encoded, x=x_col, y=y_col, color='cluster',
-                  title=f'Clusterização com base em {x_col} e {y_col}',color_continuous_scale=px.colors.sequential.Plasma)
+# Criar o gráfico de dispersão com a clusterização, utilizando a paleta de cores categórica
+fig = px.scatter(df_new_encoded, 
+                 x='popularity', 
+                 y='vote_average', 
+                 color='cluster',
+                 title=f'Clusterização com base em {'popularity'} e {'vote_average'}',
+                 color_discrete_sequence=px.colors.qualitative.Plotly)  # Mesma paleta de cores
 
 # Exibir o gráfico no Streamlit
 st.title("Visualização de Clusterização")
@@ -351,6 +334,7 @@ st.plotly_chart(fig)
 
 
 
+#silhoueta
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
@@ -411,18 +395,10 @@ ax.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
 st.pyplot(fig)
 
 
-
-
-
+import plotly.express as px
+import streamlit as st
 
 st.title("Exploração dos resultados")
-
-import streamlit as st
-import plotly.express as px
-import pandas as pd
-
-
-
 # Agrupar o DataFrame por cluster e calcular a média de algumas colunas
 cluster_stats = df_new_encoded.groupby('cluster').agg({
     'popularity': 'mean',
@@ -439,47 +415,37 @@ fig = px.bar(cluster_stats,
              y=['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count'], 
              title='Estatísticas dos Clusters',
              labels={'value': 'Média', 'cluster': 'Cluster'},
-             height=500,  # altura ajustada
-             width=800,color_discrete_sequence=px.colors.qualitative.Plotly)   # largura ajustada
+             height=500, 
+             width=800,)
 
 # Configurar para barras empilhadas
 fig.update_layout(barmode='stack')
-
-# Configuração do Streamlit
 st.write("Gráfico das Estatísticas dos Clusters:")
 st.plotly_chart(fig)
 
-
-genre_counts_by_cluster = df_new_encoded.groupby('cluster')[top_20_genres_names].sum()
-
-# Transpor o DataFrame para que os gêneros sejam as linhas e os clusters as colunas
-genre_counts_by_cluster = genre_counts_by_cluster.T.reset_index()
-
-# Criar o gráfico de barras empilhadas interativo
+import plotly.express as px
+genre_counts_by_cluster = df_new_encoded.groupby('cluster')[top_20_genres_names].sum().T.reset_index()
+# Criar o gráfico de barras empilhadas interativo com os eixos x e y trocados
 fig = px.bar(genre_counts_by_cluster, 
-             x='index', 
-             y=genre_counts_by_cluster.columns[1:], 
+             x=genre_counts_by_cluster.columns[1:],  # Novo eixo x: Gêneros
+             y='index',  # Novo eixo y: Quantidade
              title='Gêneros por Cluster',
-             labels={'index': 'Gêneros', 'value': 'Quantidade'},
-             height=500,  # Altura ajustada
-             width=900,   # Largura ajustada
-             color_discrete_sequence=px.colors.qualitative.Plotly)  # Manter padrão de cor
+             labels={'index': 'Gêneros', 'value': 'Quantidade'},  # Ajustar os rótulos conforme os novos eixos
+             height=500, 
+             width=900, 
+              color_discrete_sequence=px.colors.qualitative.Plotly)
 
-# Configurar para barras empilhadas
 fig.update_layout(barmode='stack')
+fig.update_yaxes(tickangle=0)  # Ajustar a orientação dos ticks no novo eixo y
+fig.update_xaxes(title='Quantidade')  # Adicionar título ao eixo x
+fig.update_layout(yaxis_title='Gêneros')  # Adicionar título ao eixo y
 
-# Ajustar a rotação dos rótulos do eixo x
-fig.update_xaxes(tickangle=-40)
-
-# Configuração do Streamlit
+# Mostrar o gráfico interativo
 st.write("Gráfico de Gêneros por Cluster:")
 st.plotly_chart(fig)
 
-import streamlit as st
-import plotly.express as px
-import pandas as pd
 
-
+cluster_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
 # Lista de colunas categóricas
 categorical_cols = ['budget_category', 'revenue_category', 'popularity_category', 'runtime_category', 'vote_average_category', 'vote_count_category']
 
@@ -488,97 +454,61 @@ for col in categorical_cols:
     fig = px.histogram(df_new_encoded, 
                        x=col, 
                        color='cluster', 
-                       barmode='stack',  # Barras empilhadas por cluster
+                       barmode='stack', 
                        title=f'Distribuição de {col.replace("_", " ").title()} por Cluster',
                        labels={col: col.replace('_', ' ').title(), 'count': 'Contagem'},
-                       color_discrete_sequence=px.colors.qualitative.Plotly,  # Manter padrão de cor
-                       height=500,  # Altura ajustada
-                       width=900)   # Largura ajustada
-
-    # Exibir o gráfico no Streamlit
+                        color_discrete_sequence=px.colors.qualitative.Plotly,
+                       height=500, 
+                       width=900)
+    
     st.write(f"Gráfico de Distribuição para {col.replace('_', ' ').title()}:")
     st.plotly_chart(fig)
 
-import streamlit as st
-import plotly.express as px
-import pandas as pd
-
-# Supondo que você já tenha carregado seu DataFrame df_new_encoded
-# df_new_encoded = pd.read_csv('path/to/your/file.csv')
-
-# Lista de colunas numéricas
-import streamlit as st
-import plotly.express as px
-
-# Use seu DataFrame original, df_new_encoded
-# Certifique-se de que df_new_encoded já foi carregado e está pronto para uso
-
-# Definir as colunas numéricas do seu DataFrame
+# Definir as colunas numéricas
 numeric_cols = ['popularity', 'adjusted_budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
 
-# Título do app
 st.title('Detecção e Remoção de Outliers em Boxplots')
 
 # Selecionar a coluna numérica para visualização
 coluna_selecionada = st.selectbox('Selecione a coluna para verificar os outliers:', numeric_cols)
 
-# Calcular IQR (Intervalo Interquartil) para detectar outliers
+# Calcular IQR (Intervalo Interquartil)
 Q1 = df_new_encoded[coluna_selecionada].quantile(0.25)
 Q3 = df_new_encoded[coluna_selecionada].quantile(0.75)
 IQR = Q3 - Q1
-
-# Definir os limites baseados no IQR
 limite_inferior = Q1 - 1.5 * IQR
 limite_superior = Q3 + 1.5 * IQR
 
-# Adicionar botões
+# Adicionar botões para remover outliers
 if st.button('Remover Outliers'):
-    # Filtrar o DataFrame para remover os outliers com base nos limites calculados
     df_filtrado = df_new_encoded[(df_new_encoded[coluna_selecionada] >= limite_inferior) & (df_new_encoded[coluna_selecionada] <= limite_superior)]
-
-    # Criar o boxplot para a coluna selecionada sem os outliers
     fig = px.box(df_filtrado, x='cluster', y=coluna_selecionada, color='cluster',
-                 title=f'Comparação de Distribuições de {coluna_selecionada} por Cluster (Sem Outliers)')
-
-    # Exibir o boxplot no Streamlit
-    st.plotly_chart(fig)
-
-    # Mostrar DataFrame filtrado, se necessário
-    st.write("DataFrame após remoção de outliers:")
-    st.write(df_filtrado)
+                 title=f'Comparação de {coluna_selecionada} por Cluster (Sem Outliers)',
+                  color_discrete_sequence=px.colors.qualitative.Plotly)
 else:
-    # Criar o boxplot original sem remover os outliers
     fig = px.box(df_new_encoded, x='cluster', y=coluna_selecionada, color='cluster',
-                 title=f'Comparação de Distribuições de {coluna_selecionada} por Cluster (Com Outliers)')
+                 title=f'Comparação de {coluna_selecionada} por Cluster (Com Outliers)',
+                  color_discrete_sequence=px.colors.qualitative.Plotly)
 
-    # Exibir o boxplot no Streamlit
-    st.plotly_chart(fig)
+st.plotly_chart(fig)
 
 
-import streamlit as st
-import plotly.express as px
-import pandas as pd
 
-# Supondo que você já tenha carregado seu DataFrame df_new_encoded
-# df_new_encoded = pd.read_csv('path/to/your/file.csv')
-
-# Criar o gráfico de dispersão
+# Gráfico de dispersão: Ano de Lançamento e Popularidade
 fig = px.scatter(df_new_encoded, 
                  x='release_year', 
                  y='popularity', 
                  color='cluster',
-                 title='Ano de Lançamento em Relação aos Clusters')
+                 title='Ano de Lançamento em Relação aos Clusters',
+                  color_discrete_sequence=px.colors.qualitative.Plotly)
 
-# Exibir o gráfico no Streamlit
 st.write("Gráfico de Dispersão: Ano de Lançamento em Relação aos Clusters")
 st.plotly_chart(fig)
 
 
-import streamlit as st
-import plotly.express as px
-import pandas as pd
+cluster_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
 
-# Agrupar por ano e cluster para calcular a média das colunas numéricas
+# Tendência de Popularidade por Cluster ao Longo dos Anos
 trend_stats = df_new_encoded.groupby(['release_year', 'cluster']).agg({
     'popularity': 'mean',
     'budget': 'mean',
@@ -588,19 +518,92 @@ trend_stats = df_new_encoded.groupby(['release_year', 'cluster']).agg({
     'vote_count': 'mean'
 }).reset_index()
 
-# Criar o gráfico de linha para visualizar a tendência ao longo dos anos por cluster
 fig = px.line(trend_stats, 
               x='release_year', 
-              y='popularity',  # Altere essa coluna para outras variáveis que deseja explorar
+              y='popularity',  
               color='cluster', 
               title='Tendência de Popularidade por Cluster ao Longo dos Anos',
               labels={'release_year': 'Ano', 'popularity': 'Média de Popularidade'},
-              color_discrete_sequence=px.colors.qualitative.Plotly,
+               color_discrete_sequence=px.colors.qualitative.Plotly,
               height=500, 
               width=900)
 
-# Exibir o gráfico no Streamlit
 st.write("Gráfico de Tendência de Popularidade por Cluster ao Longo dos Anos")
+st.plotly_chart(fig)
+
+
+
+#COLOCAR OS GRÁFICOS DE EXPLORAÇÃO DOS RESULTADOS SEM NORMALIZAÇÃO
+
+st.title('Exploração dos dados iniciais')
+
+import streamlit as st
+import plotly.express as px
+df_new_encoded_before_normalization['cluster'] = df_new_encoded['cluster']
+
+
+# Definir as cores para os clusters
+cluster_colors = {
+    0: '#636EFA',  # Azul para o Cluster 0
+    1: '#EF553B',  # Verde para o Cluster 1
+    2: '#00CC96',  # Roxo para o Cluster 2
+    3: '#AB63FA',  # Vermelho para o Cluster 3
+}
+
+# Selecione as colunas numéricas para o boxplot
+numeric_cols = ['popularity', 'budget', 'revenue', 'runtime', 'vote_average', 'vote_count']
+
+# Criar os boxplots para cada coluna numérica, removendo outliers
+for col in numeric_cols:
+    # Calcular IQR (Intervalo Interquartil) para detectar outliers
+    Q1 = df_new_encoded_before_normalization[col].quantile(0.25)
+    Q3 = df_new_encoded_before_normalization[col].quantile(0.75)
+    IQR = Q3 - Q1
+
+    # Definir os limites baseados no IQR
+    limite_inferior = Q1 - 1.5 * IQR
+    limite_superior = Q3 + 1.5 * IQR
+
+    # Filtrar o DataFrame para remover os outliers
+    df_filtrado_original = df_new_encoded_before_normalization[(df_new_encoded_before_normalization[col] >= limite_inferior) & (df_new_encoded_before_normalization[col] <= limite_superior)]
+
+    # Criar o boxplot sem outliers
+    fig = px.box(df_filtrado_original, x='cluster', y=col, color='cluster',
+                 title=f'Comparação de Distribuições de {col} por Cluster (Dados Originais, Sem Outliers)', 
+                 color_discrete_map=cluster_colors)
+    
+    # Exibir o gráfico no Streamlit
+    st.plotly_chart(fig)
+
+import streamlit as st
+import plotly.express as px
+
+# Definir as cores para os clusters
+cluster_colors = ['#636EFA', '#EF553B', '#00CC96', '#AB63FA']
+
+# Agrupar o DataFrame por cluster e contar a frequência de cada gênero em cada cluster
+genre_counts_by_cluster = df_new_encoded_before_normalization.groupby('cluster')[top_20_genres_names].sum()
+
+# Transpor o DataFrame para que os gêneros sejam as linhas e os clusters as colunas
+genre_counts_by_cluster = genre_counts_by_cluster.T.reset_index()
+
+# Criar o gráfico de barras empilhadas interativo (com eixo x e y trocados)
+fig = px.bar(genre_counts_by_cluster,
+             y='index',  # Gêneros no eixo Y
+             x=genre_counts_by_cluster.columns[1:],  # Quantidade por cluster no eixo X
+             title='Gêneros por Cluster (Dados Originais)',
+             labels={'index': 'Gêneros', 'value': 'Quantidade'},
+             height=500,  # Altura ajustada
+             width=900,   # Largura ajustada
+             color_discrete_sequence=cluster_colors)  # Manter padrão de cor
+
+# Configurar para barras empilhadas
+fig.update_layout(barmode='stack')
+
+# Ajustar a rotação dos rótulos do eixo y
+fig.update_yaxes(tickangle=0)
+
+# Mostrar o gráfico no Streamlit
 st.plotly_chart(fig)
 
 
