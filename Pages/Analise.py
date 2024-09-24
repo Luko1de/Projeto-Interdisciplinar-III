@@ -160,7 +160,134 @@ st.write("Filmes com maior duração (top 10):")
 most_voted_movies = df_runtime[['title', 'runtime']].sort_values(by='runtime', ascending=False).head(10)
 st.write(most_voted_movies)
 
-#Palavras chaves mais comuns
+#Analise do budget
+st.title("Análise do Orçamento e Gêneros")
+
+df_budget = pd.read_csv(r'C:\Users\eleve\Downloads/movies.csv', nrows=10000)
+
+# Processar a coluna budget e revenue
+df_budget['budget'] = df_budget['budget'].astype(str).str.replace(',', '').astype(float)
+df_budget['revenue'] = df_budget['revenue'].astype(str).str.replace(',', '').astype(float)
+df_budget['popularity'] = df_budget['popularity'].astype(float)
+df_budget['vote_average'] = df_budget['vote_average'].astype(float)
+df_budget['vote_count'] = df_budget['vote_count'].astype(float)
+df_budget['runtime'] = df_budget['runtime'].astype(float)
+
+# Preprocessar a coluna de gêneros
+df_budget['genres'] = df_budget['genres'].fillna('')
+df_budget['genres_list'] = df_budget['genres'].apply(lambda x: x.split('-'))
+df_budget.dropna(subset='budget')
+# Processar a coluna budget e revenue
+
+# Criar um conjunto com todos os gêneros únicos
+all_genres = set(genre for sublist in df_budget['genres_list'] for genre in sublist if genre)
+
+# Manter apenas os gêneros mais frequentes para simplificar
+top_genres = pd.Series([genre for sublist in df_budget['genres_list'] for genre in sublist]).value_counts().head(10).index
+df_top_genres = df_budget[df_budget['genres_list'].apply(lambda x: any(genre in x for genre in top_genres))]
+
+# Criar colunas binárias para os principais gêneros
+for genre in top_genres:
+    df_top_genres[genre] = df_top_genres['genres_list'].apply(lambda x: 1 if genre in x else 0)
+
+# Calcular o saldo (revenue - budget) por gênero
+genre_saldo = {}
+for genre in top_genres:
+    genre_data = df_top_genres[df_top_genres[genre] == 1]
+    saldo = (genre_data['revenue'] - genre_data['budget']).sum()
+    genre_saldo[genre] = saldo
+
+# Converter o dicionário para DataFrame para visualização
+genre_saldo_df = pd.DataFrame(list(genre_saldo.items()), columns=['Gênero', 'Saldo']).sort_values(by='Saldo', ascending=False)
+
+# Criar o gráfico de barras para mostrar o saldo por gênero
+st.write("Saldo total (receita - orçamento) por gênero dos filmes:")
+
+fig_bar = px.bar(genre_saldo_df, 
+                    x='Gênero', 
+                    y='Saldo',
+                    labels={'Saldo': 'Saldo (Receita - Orçamento)', 'Gênero': 'Gênero'},
+                    title='Saldo Total por Gênero')
+
+st.plotly_chart(fig_bar, use_container_width=True)
+
+# Gráficos de Dispersão para budget e revenue
+st.write("### Gráfico de Dispersão do Orçamento (Budget)")
+st.write("Visualiza a distribuição do orçamento dos filmes, ajudando a identificar outliers e entender a variação dos valores de orçamento.")
+fig_scatter_budget = px.scatter(df_budget, x=df_budget.index, y='budget', title='Dispersão do Orçamento dos Filmes')
+st.plotly_chart(fig_scatter_budget, use_container_width=True)
+
+st.write("### Gráfico de Dispersão da Receita (Revenue)")
+st.write("Visualiza a distribuição da receita dos filmes, permitindo a identificação de filmes com receitas excepcionalmente altas ou baixas.")
+fig_scatter_revenue = px.scatter(df_budget, x=df_budget.index, y='revenue', title='Dispersão da Receita dos Filmes')
+st.plotly_chart(fig_scatter_revenue, use_container_width=True)
+
+# Análise da Popularidade por Gênero
+st.write("### Popularidade Média por Gênero")
+st.write("Insights sobre quais gêneros são mais populares podem ser usados para segmentação de mercado e recomendação de filmes.")
+genre_popularity = df_budget.explode('genres_list').groupby('genres_list')['popularity'].mean().reset_index()
+genre_popularity = genre_popularity.sort_values(by='popularity', ascending=False)
+fig_genre_popularity = px.bar(genre_popularity, x='genres_list', y='popularity', labels={'genres_list': 'Gênero', 'popularity': 'Popularidade Média'}, title='Popularidade Média por Gênero')
+st.plotly_chart(fig_genre_popularity, use_container_width=True)
+
+# Análise da Receita por Gênero
+st.write("### Receita Média por Gênero")
+st.write("Identificar quais gêneros são mais lucrativos pode ajudar na tomada de decisões estratégicas para produções futuras e alocação de recursos.")
+genre_revenue = df_budget.explode('genres_list').groupby('genres_list')['revenue'].mean().reset_index()
+genre_revenue = genre_revenue.sort_values(by='revenue', ascending=False)
+fig_genre_revenue = px.bar(genre_revenue, x='genres_list', y='revenue', labels={'genres_list': 'Gênero', 'revenue': 'Receita Média'}, title='Receita Média por Gênero')
+st.plotly_chart(fig_genre_revenue, use_container_width=True)
+
+# Análise da Avaliação Média por Gênero
+st.write("### Avaliação Média por Gênero")
+st.write("Gêneros com avaliações mais altas podem indicar preferências de qualidade, informando sistemas de recomendação que priorizem filmes bem avaliados.")
+genre_vote_average = df_budget.explode('genres_list').groupby('genres_list')['vote_average'].mean().reset_index()
+genre_vote_average = genre_vote_average.sort_values(by='vote_average', ascending=False)
+fig_genre_vote_average = px.bar(genre_vote_average, x='genres_list', y='vote_average', labels={'genres_list': 'Gênero', 'vote_average': 'Avaliação Média'}, title='Avaliação Média por Gênero')
+st.plotly_chart(fig_genre_vote_average, use_container_width=True)
+
+# Análise de Receita e Avaliação por Idioma
+st.write("### Receita Média por Idioma")
+st.write("Entender o impacto do idioma na receita pode influenciar estratégias de marketing e distribuição.")
+language_revenue = df_budget.groupby('original_language')['revenue'].mean().reset_index()
+language_revenue = language_revenue.sort_values(by='revenue', ascending=False)
+fig_language_revenue = px.bar(language_revenue, x='original_language', y='revenue', labels={'original_language': 'Idioma', 'revenue': 'Receita Média'}, title='Receita Média por Idioma')
+st.plotly_chart(fig_language_revenue, use_container_width=True)
+
+st.write("### Avaliação Média por Idioma")
+st.write("Compreender o impacto do idioma na avaliação pode informar sobre preferências culturais e de qualidade.")
+language_vote_average = df_budget.groupby('original_language')['vote_average'].mean().reset_index()
+language_vote_average = language_vote_average.sort_values(by='vote_average', ascending=False)
+fig_language_vote_average = px.bar(language_vote_average, x='original_language', y='vote_average', labels={'original_language': 'Idioma', 'vote_average': 'Avaliação Média'}, title='Avaliação Média por Idioma')
+st.plotly_chart(fig_language_vote_average, use_container_width=True)
+
+# Análise Temporal de Lançamentos
+st.write("### Tendência de Lançamentos ao Longo dos Anos")
+st.write("Analisar tendências de lançamentos pode ajudar a identificar períodos de alta atividade na indústria cinematográfica e prever tendências futuras.")
+df_budget['release_date'] = pd.to_datetime(df_budget['release_date'], errors='coerce')
+release_trend = df_budget.set_index('release_date').resample('Y')['id'].count().reset_index()
+fig_release_trend = px.line(release_trend, x='release_date', y='id', labels={'release_date': 'Ano', 'id': 'Número de Filmes Lançados'}, title='Tendência de Lançamentos ao Longo dos Anos')
+st.plotly_chart(fig_release_trend, use_container_width=True)
+
+# Análise da Duração dos Filmes
+st.write("### Distribuição da Duração dos Filmes")
+st.write("Entender a distribuição da duração dos filmes pode informar sobre a preferência do público e influenciar a edição e produção de futuros filmes.")
+fig_runtime = px.histogram(df_budget, x='runtime', nbins=50, labels={'runtime': 'Duração (minutos)'}, title='Distribuição da Duração dos Filmes')
+st.plotly_chart(fig_runtime, use_container_width=True)
+
+# Análise da Contagem de Votos
+st.write("### Distribuição da Contagem de Votos")
+st.write("Analisar a contagem de votos pode ajudar a entender o engajamento do público, útil para estratégias de marketing e para ajustar modelos de predição de popularidade.")
+fig_vote_count = px.histogram(df_budget, x='vote_count', nbins=50, labels={'vote_count': 'Contagem de Votos'}, title='Distribuição da Contagem de Votos')
+st.plotly_chart(fig_vote_count, use_container_width=True)
+
+# Análise de Avaliações
+st.write("### Distribuição das Avaliações dos Filmes")
+st.write("Compreender a distribuição das avaliações pode ajudar a ajustar modelos de predição de qualidade e a desenvolver sistemas de recomendação que priorizem filmes bem avaliados.")
+fig_vote_average = px.histogram(df_budget, x='vote_average', nbins=50, labels={'vote_average': 'Avaliação Média'}, title='Distribuição das Avaliações dos Filmes')
+st.plotly_chart(fig_vote_average, use_container_width=True)
+
+# #Palavras chaves mais comuns
 st.write("Wordcloud das palavras chaves mais comuns")
 
 # Carregar os dados
@@ -337,3 +464,4 @@ for epoca, (inicio, fim) in epocas.items():
     # Exibir os 3 filmes mais populares da época
     print(f"\n--- {epoca} ---")
     st.write(filmes_epoca_ordenados[['title', 'popularity']].head(3))
+ 
