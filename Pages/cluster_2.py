@@ -6,8 +6,6 @@ import plotly.express as px
 
 st.title('Exploração do Dataset de Filmes')
 
-# Opção de upload de arquivo CSV
-file_path = st.file_uploader("Carregar arquivo CSV", type=["csv"])
 @st.cache_data
 def load_data():
     # Corrigir a leitura do arquivo CSV
